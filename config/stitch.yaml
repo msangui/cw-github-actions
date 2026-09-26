@@ -1,0 +1,8 @@
+# ffmpeg mix parameters. Replaces tool_configs.stitch.
+tts_delay_ms: 12000       # voice track enters at t=12s
+duck_start_s: 9           # intro starts ducking at t=9s ...
+duck_end_s: 15            # ... and reaches the floor at t=15s
+intro_volume_floor: 0.25  # intro sits at 0.25x under the voices
+loudnorm_i: -16           # EBU R128 integrated loudness target (LUFS)
+loudnorm_tp: -1.5         # true peak (dBTP)
+loudnorm_lra: 11          # loudness range

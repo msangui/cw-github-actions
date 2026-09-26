@@ -1,0 +1,21 @@
+# CFO agent thresholds and pricing. Spend is tracked in <storage>/state/costs.json.
+pricing:
+  # USD per 1M tokens, keyed by model prefix. First matching prefix wins.
+  llm:
+    claude-opus-5:   { input: 5.00,  output: 25.00 }
+    claude-sonnet-5: { input: 2.00,  output: 10.00 }
+    claude-opus-4:   { input: 5.00,  output: 25.00 }
+    claude-sonnet-4: { input: 3.00,  output: 15.00 }
+    claude-haiku-4:  { input: 1.00,  output: 5.00 }
+    default:         { input: 5.00,  output: 25.00 }
+  # USD per 1K characters (ElevenLabs Creator plan effective rate)
+  elevenlabs_per_1k_chars: 0.33
+  # USD per Serper query
+  serper_per_query: 0.001
+
+thresholds:
+  daily_alert: 5.00             # alert, investigate, do not pause
+  daily_alert_breakdown: 6.00   # alert with per-service breakdown
+  monthly_warn: 120.00          # alert with month-end projection
+  monthly_hard_pause: 145.00    # refuse to start a new run (override with CW_IGNORE_BUDGET=1)
+  target_monthly: 54.00

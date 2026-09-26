@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pip install -q -e ".[dev]"
+      - run: ruff check pipeline tests
+      - run: pytest -q
+      # Full text pipeline against live RSS feeds with no API keys: exercises ingest,
+      # scoring, dedup, stub writer/editor and local storage end-to-end.
+      - name: Smoke run (no keys, local storage, dry run)
+        run: python -m pipeline run --dry-run --skip-aisle

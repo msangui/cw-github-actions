@@ -1,0 +1,18 @@
+# ElevenLabs settings. Replaces tool_configs.elevenlabs.
+# Voice IDs can be overridden with CLAIRE_VOICE_ID / FLINT_VOICE_ID env vars.
+model_id: "eleven_turbo_v2_5"
+gap_between_calls_ms: 300
+retry_delays_seconds: [1, 2, 4]
+voices:
+  CLAIRE:
+    voice_id: "4H51QyuSmftmRXcPsyuT"
+    stability: 0.28
+    similarity_boost: 0.75
+    style: 0.40
+    use_speaker_boost: true
+  FLINT:
+    voice_id: "YHQkX6Ayz2dYGz3boNmC"
+    stability: 0.50
+    similarity_boost: 0.75
+    style: 0.35
+    use_speaker_boost: true

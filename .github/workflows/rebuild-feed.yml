@@ -1,0 +1,44 @@
+name: Rebuild feed
+
+# Regenerates feed.xml / feed-extended.xml from the episode.json files already in the bucket.
+# Use after editing config/podcast.yaml (title, description, cover, categories).
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -q -e .
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Configure AWS credentials (access keys)
+        if: ${{ vars.AWS_ROLE_ARN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Rebuild feeds
+        env:
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_PREFIX: ${{ vars.S3_PREFIX }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          LOG_FORMAT: json
+        run: python -m pipeline rebuild-feed

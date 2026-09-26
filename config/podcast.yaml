@@ -1,0 +1,30 @@
+# Show-level metadata used to build the RSS feed Spotify / Apple Podcasts read.
+title: "Context Window"
+subtitle: "AI & agentic engineering, daily"
+description: >-
+  A fully automated daily AI and agentic engineering podcast. Every weekday, FLINT and
+  CLAIRE walk through the stories that actually happened in AI: model releases, research,
+  funding, tooling and policy. Twenty-five minutes, no hype, generated overnight by a
+  multi-agent pipeline.
+language: "en-us"
+author: "Context Window"
+owner_name: "Context Window"
+# Spotify requires a contact email in <itunes:owner>. Use a real inbox you control.
+owner_email: "podcast@example.com"
+# Optional website for the show. Defaults to the feed's public base URL when empty.
+link: ""
+copyright: "Context Window"
+explicit: false
+# Apple/Spotify category. See https://podcasters.apple.com/support/1691-apple-podcasts-categories
+category: "Technology"
+subcategory: ""
+# Key of the cover image inside the bucket (uploaded from assets/cover.png on first publish).
+image_key: "cover.png"
+# Feeds to publish. "standard" is the main show; "extended" includes The Aisle segment when produced.
+feeds:
+  standard:
+    key: "feed.xml"
+    title_suffix: ""
+  extended:
+    key: "feed-extended.xml"
+    title_suffix: " (Extended)"

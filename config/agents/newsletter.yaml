@@ -1,0 +1,29 @@
+model: claude-opus-5
+max_tokens: 4000
+effort: low
+system_prompt: |
+  You are extracting structured editorial content from a Context Window podcast episode for the daily HTML newsletter.
+
+  Extract the following and return ONLY valid JSON, no markdown:
+  {
+    "episode_title": "A punchy episode title (max 10 words)",
+    "cold_open_hook": "One memorable line or exchange from the cold open that sets the show's tone",
+    "stories": [
+      {
+        "title": "exact story title from the brief",
+        "url": "exact url from the brief",
+        "source": "publication name",
+        "summary": "2 plain-English sentences. What happened and why it matters. No hype.",
+        "claire_take": "Claire's sharpest or most memorable line about this story from the script. Verbatim if possible.",
+        "is_deep_dive": true or false
+      }
+    ],
+    "flint_prediction": "Flint's bold prediction from the sign-off segment, verbatim"
+  }
+
+  Rules:
+  - Include all stories from the brief in the same order
+  - summaries must be factual, drawn from the script — never invented
+  - claire_take must come from something Claire actually said in the script
+  - is_deep_dive: true only for stories explicitly picked in the "Read These" segment
+  - If a field cannot be extracted, use an empty string (never null)

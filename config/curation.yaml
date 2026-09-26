@@ -1,0 +1,17 @@
+# Deterministic curator parameters (the Python scoring, not the LLM prompt).
+main:
+  min_score: 2
+  max_stories: 14
+  deep_dive_count: 4
+  deep_dive_min_coverage: 2
+  dedup_window_days: 21
+  title_overlap_threshold: 0.6
+  embedding_distance_threshold: 0.08   # cosine distance; matches the pgvector "<=> < 0.08" check
+aisle:
+  max_stories: 5
+  dedup_window_days: 21
+  title_overlap_threshold: 0.6
+coverage:
+  # Only the top N stories by recency + tier are sent to Serper (cost/time control).
+  max_stories_to_search: 150
+  concurrency: 8

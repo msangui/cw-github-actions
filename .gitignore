@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+.env.local
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Pipeline output (keep directory, ignore contents)
+output/episodes/*
+!output/episodes/.gitkeep
+output/site/
+
+# Generated audio anywhere except the bundled intro jingle
+*.mp3
+!assets/intro.mp3

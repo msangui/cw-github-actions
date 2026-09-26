@@ -1,0 +1,144 @@
+name: Daily episode
+
+on:
+  schedule:
+    # GitHub cron is UTC. 06:00 UTC = 03:00 America/Argentina/Buenos_Aires (the original
+    # pipeline's start time). Scheduled runs can lag by up to ~30 minutes.
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      episode_date:
+        description: "Episode date (YYYY-MM-DD). Empty = today (UTC)."
+        required: false
+        default: ""
+      dry_run:
+        description: "Text only: curate/write/edit, no TTS, no publish"
+        type: boolean
+        default: false
+      fresh:
+        description: "Ignore checkpoints and regenerate everything"
+        type: boolean
+        default: false
+      skip_aisle:
+        description: "Skip The Aisle (CPG/Retail) segment"
+        type: boolean
+        default: false
+
+# One episode at a time. A second trigger for the same day waits, then resumes from checkpoints.
+concurrency:
+  group: daily-episode
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # AWS OIDC
+  contents: read
+
+env:
+  LOG_FORMAT: json
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  produce:
+    name: Produce & publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version | head -1
+
+      - name: Install pipeline
+        run: pip install -q -e .
+
+      # ── AWS credentials ────────────────────────────────────────────────────
+      # Preferred: OIDC role (no long-lived keys). Set repo variable AWS_ROLE_ARN.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      # Fallback: static keys in repo secrets.
+      - name: Configure AWS credentials (access keys)
+        if: ${{ vars.AWS_ROLE_ARN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Check configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_PREFIX: ${{ vars.S3_PREFIX }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+        run: python -m pipeline check-config
+
+      - name: Produce episode
+        id: produce
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLAIRE_VOICE_ID: ${{ vars.CLAIRE_VOICE_ID }}
+          FLINT_VOICE_ID: ${{ vars.FLINT_VOICE_ID }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_PREFIX: ${{ vars.S3_PREFIX }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          CW_IGNORE_BUDGET: ${{ vars.CW_IGNORE_BUDGET || '0' }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.episode_date }}" ]; then ARGS="$ARGS --date ${{ inputs.episode_date }}"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "${{ inputs.fresh }}" = "true" ]; then ARGS="$ARGS --fresh"; fi
+          if [ "${{ inputs.skip_aisle }}" = "true" ]; then ARGS="$ARGS --skip-aisle"; fi
+          python -m pipeline run $ARGS --github-output "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Context Window — ${{ steps.produce.outputs.episode_date || 'n/a' }}"
+            echo ""
+            echo "**Status:** \`${{ steps.produce.outputs.status || 'unknown' }}\`"
+            if [ -n "${{ steps.produce.outputs.audio_url }}" ]; then echo "- 🎧 [Episode MP3](${{ steps.produce.outputs.audio_url }})"; fi
+            if [ -n "${{ steps.produce.outputs.extended_audio_url }}" ]; then echo "- 🛒 [Extended (The Aisle)](${{ steps.produce.outputs.extended_audio_url }})"; fi
+            if [ -n "${{ steps.produce.outputs.newsletter_url }}" ]; then echo "- 📰 [Newsletter](${{ steps.produce.outputs.newsletter_url }})"; fi
+            if [ -n "${{ steps.produce.outputs.feed_url }}" ]; then echo "- 📡 Feed: ${{ steps.produce.outputs.feed_url }}"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Scripts, brief, cost, LLM logs and status — never the per-line audio.
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-${{ steps.produce.outputs.episode_date || github.run_id }}
+          retention-days: 30
+          if-no-files-found: ignore
+          path: |
+            output/episodes/**/*.json
+            output/episodes/**/*.txt
+            output/episodes/**/*.html
+            output/episodes/**/episode_*.mp3
+            !output/episodes/**/lines/**
+            !output/episodes/**/aisle/**
+            !output/episodes/**/concat*.mp3
+            !output/episodes/**/premix*.mp3
