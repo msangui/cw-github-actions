@@ -7,7 +7,12 @@
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-        "StringLike": { "token.actions.githubusercontent.com:sub": "repo:GITHUB_OWNER/GITHUB_REPO:*" }
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:GITHUB_OWNER/GITHUB_REPO:*",
+            "repo:GITHUB_OWNER@GITHUB_OWNER_ID/GITHUB_REPO@GITHUB_REPO_ID:*"
+          ]
+        }
       }
     }
   ]

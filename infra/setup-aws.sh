@@ -69,8 +69,25 @@ else
 fi
 
 # 3. Role + policy
+# GitHub's OIDC `sub` claim now embeds numeric IDs: repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:...
+# The trust policy accepts both the classic and the ID-qualified form, so we need the IDs.
 OWNER="${REPO%%/*}"; NAME="${REPO##*/}"
-sed -e "s#ACCOUNT_ID#$ACCOUNT_ID#g" -e "s#GITHUB_OWNER#$OWNER#g" -e "s#GITHUB_REPO#$NAME#g" "$HERE/github-oidc-trust-policy.json" > /tmp/cw-trust.json
+if command -v gh >/dev/null 2>&1 && IDS="$(gh api "repos/$REPO" --jq '"\(.owner.id) \(.id)"' 2>/dev/null)"; then
+  OWNER_ID="${IDS%% *}"; REPO_ID="${IDS##* }"
+else
+  OWNER_ID="$(curl -fsSL "https://api.github.com/users/$OWNER" | sed -n 's/.*"id": *\([0-9]*\),.*/\1/p' | head -1)"
+  REPO_ID="$(curl -fsSL "https://api.github.com/repos/$REPO" | sed -n 's/.*"id": *\([0-9]*\),.*/\1/p' | head -1)"
+fi
+if [ -z "${OWNER_ID:-}" ] || [ -z "${REPO_ID:-}" ]; then
+  echo "✗ Could not resolve GitHub owner/repo IDs for $REPO (needed for the OIDC trust policy)." >&2
+  echo "  Install gh (and run gh auth login) or check the repo name, then re-run." >&2
+  exit 1
+fi
+echo "✓ GitHub IDs: owner=$OWNER_ID repo=$REPO_ID"
+sed -e "s#ACCOUNT_ID#$ACCOUNT_ID#g" \
+    -e "s#GITHUB_OWNER_ID#$OWNER_ID#g" -e "s#GITHUB_REPO_ID#$REPO_ID#g" \
+    -e "s#GITHUB_OWNER#$OWNER#g" -e "s#GITHUB_REPO#$NAME#g" \
+    "$HERE/github-oidc-trust-policy.json" > /tmp/cw-trust.json
 sed -e "s#BUCKET_NAME#$BUCKET#g" "$HERE/github-actions-iam-policy.json" > /tmp/cw-perms.json
 
 if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
