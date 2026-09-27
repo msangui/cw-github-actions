@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from pipeline.analytics import Analytics, sanitize_agent_overrides
 from pipeline.checkpoint import Checkpoints
 from pipeline.config import Settings
 from pipeline.llm import LLM
@@ -53,27 +55,71 @@ class EpisodeRun:
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.storage = Storage(settings)
         self.memory = HeadlineMemory(self.storage)
-        self.llm = LLM(settings, log_dir=self.out_dir / "llm_logs")
+        self.analytics = Analytics(settings, episode_date)
+        self.llm = LLM(settings, log_dir=self.out_dir / "llm_logs", analytics=self.analytics)
         self.ckpt = Checkpoints(self.storage, episode_date, self.out_dir, fresh=settings.fresh)
         self.log = log.bind(date=episode_date)
         self.status_log: list[dict[str, str]] = []
         self.llm_calls: list[tuple[str, str | None, dict[str, int]]] = []
         self.serper_queries = 0
         self.tts_chars = 0
+        self.started = time.time()
+        self._status_since = self.started
+        self._status: Optional[str] = None
 
     # ── helpers ────────────────────────────────────────────────────────────
     def set_status(self, status: str) -> None:
+        now = time.time()
         self.status_log.append({"status": status, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
         self.log.info("STATUS", status=status)
         (self.out_dir / "status.json").write_text(json.dumps({"date": self.date, "status": status, "history": self.status_log}, indent=2), encoding="utf-8")
+        self.analytics.capture("episode_status_changed", status=status, previous_status=self._status, seconds_in_previous=round(now - self._status_since, 1))
+        self._status, self._status_since = status, now
 
     def stage(self, name: str, fn, *args, **kwargs):
         cached = self.ckpt.load(name)
         if cached is not None:
+            self.analytics.capture("pipeline_stage_completed", stage=name, seconds=0.0, from_checkpoint=True)
             return cached
-        result = fn(*args, **kwargs)
+        started = time.time()
+        try:
+            result = fn(*args, **kwargs)
+        except Exception as e:
+            seconds = round(time.time() - started, 1)
+            self.analytics.capture("pipeline_stage_failed", stage=name, seconds=seconds, error=f"{type(e).__name__}: {str(e)[:300]}")
+            self.analytics.span(name, seconds, stage=name, **{"$ai_is_error": True, "$ai_error": f"{type(e).__name__}: {str(e)[:300]}"})
+            if not hasattr(e, "cw_stage"):
+                try:
+                    e.cw_stage = name  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+            raise
+        seconds = round(time.time() - started, 1)
         self.ckpt.save(name, result)
+        self.analytics.capture("pipeline_stage_completed", stage=name, seconds=seconds, from_checkpoint=False)
+        self.analytics.span(name, seconds, stage=name)
         return result
+
+    def _apply_feature_flags(self) -> Optional[str]:
+        """Evaluate the PostHog operational flags once. Returns a pause reason, or None to proceed."""
+        a, s = self.analytics, self.settings
+        if not a.enabled:
+            return None
+        a.load_flags()
+        if _flag_on(a.flag("paused", False)):
+            return f"Feature flag `{a.flag_key('paused')}` is on"
+        applied: dict[str, Any] = {}
+        if a.flag("aisle_enabled", True) is False and not s.skip_aisle:
+            s.skip_aisle = applied["skip_aisle"] = True
+        if _flag_on(a.flag("force_dry_run", False)) and not s.dry_run:
+            s.dry_run = applied["dry_run"] = True
+        overrides = sanitize_agent_overrides(a.payload("agent_overrides"))
+        if overrides:
+            s.agent_overrides = overrides
+            applied["agent_overrides"] = overrides
+        if applied:
+            self.log.info("Feature flags applied", **applied)
+        return None
 
     def _track(self, agent: str, result: dict[str, Any]) -> None:
         usage = result.get("token_usage") or {}
@@ -85,27 +131,56 @@ class EpisodeRun:
 
     # ── main ───────────────────────────────────────────────────────────────
     def run(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"status": "FAILED", "date": self.date}
+        try:
+            result = self._run_guarded()
+            return result
+        finally:
+            self._finish(result)
+
+    def _run_guarded(self) -> dict[str, Any]:
         s = self.settings
         existing = self.storage.get_json(f"episodes/{self.date}/episode.json")
         if existing and existing.get("status") == "PUBLISHED" and not s.fresh and not s.dry_run:
             self.log.info("Episode already published; nothing to do (use --fresh to regenerate)")
             return {"status": "ALREADY_PUBLISHED", "date": self.date, "episode": existing}
 
+        pause_reason = self._apply_feature_flags()
+        if pause_reason:
+            self.log.error("Paused by feature flag — refusing to run", reason=pause_reason)
+            self.analytics.capture("episode_paused", reason="feature_flag", detail=pause_reason)
+            telegram(s, f"⛔ <b>Context Window paused</b>\n{esc(pause_reason)}\nTurn the flag off in PostHog to resume.")
+            return {"status": "PAUSED", "date": self.date, "error": pause_reason}
+
         try:
             spent = cfo.check_budget_before_run(s, self.storage)
             self.log.info("Budget check passed", month_spent_usd=spent)
         except cfo.BudgetPaused as e:
             self.log.error("Budget hard-pause active — refusing to run", reason=str(e))
+            self.analytics.capture("episode_paused", reason="budget", detail=str(e))
             telegram(s, f"⛔ <b>Context Window paused</b>\n{esc(str(e))}\nSet CW_IGNORE_BUDGET=1 to override.")
             return {"status": "PAUSED", "date": self.date, "error": str(e)}
 
+        self.analytics.capture("episode_run_started", month_spent_usd=spent, resuming=bool(self.storage.list_keys(f"work/{self.date}/checkpoints/")) and not s.fresh)
         try:
             return self._run_inner()
         except Exception as e:
             self.log.error("Workflow failed", error=str(e), trace=traceback.format_exc()[-1500:])
+            self.analytics.exception(e, status=self._status, stage=getattr(e, "cw_stage", None))
             self.set_status("FAILED")
             telegram(s, f"🔴 <b>Context Window {esc(self.date)} FAILED</b>\n<code>{esc(str(e)[:800])}</code>" + (f"\n{esc(_run_url() or '')}" if _run_url() else ""))
-            return {"status": "FAILED", "date": self.date, "error": str(e)}
+            return {"status": "FAILED", "date": self.date, "error": str(e), "stage": getattr(e, "cw_stage", None)}
+
+    def _finish(self, result: dict[str, Any]) -> None:
+        """Final analytics for the run, then flush PostHog before the process exits."""
+        try:
+            seconds = round(time.time() - self.started, 1)
+            status = str(result.get("status", "FAILED"))
+            cost = result.get("cost") or {}
+            self.analytics.capture("episode_run_finished", status=status, seconds=seconds, error=(result.get("error") or None), **_cost_props(cost))
+            self.analytics.trace(status, seconds, output_state={"title": result.get("title"), "cost_usd": cost.get("total_usd"), "error": result.get("error")})
+        finally:
+            self.analytics.shutdown()
 
     def _run_inner(self) -> dict[str, Any]:
         s = self.settings
@@ -224,8 +299,26 @@ class EpisodeRun:
         )
         alerts = cfo.record_episode_cost(s, self.storage, self.date, cost)
         self.set_status("PUBLISHED")
+        for alert in alerts:
+            self.analytics.capture("budget_alert", message=alert, **_cost_props(cost))
+        episode_props = {
+            "title": metadata.get("title"),
+            "story_count": brief.get("story_count", 0),
+            "aisle_story_count": aisle_brief.get("story_count", 0),
+            "word_count": len(approved_script.split()),
+            "has_aisle_variant": extended is not None,
+            "hallucinations": len(editor_result.get("hallucinations", [])),
+            "editor_changes": len(editor_result.get("changes", [])),
+            "audio_duration_seconds": result.get("audio_duration_seconds"),
+            "tts_lines_generated": tts_result.get("generated", 0),
+            "tts_lines_reused": tts_result.get("reused", 0),
+            "audio_url": result.get("audio_url"),
+            **_cost_props(cost),
+        }
+        self.analytics.capture("episode_published", **episode_props)
+        self.analytics.identify_episode(status="PUBLISHED", **episode_props)
         self._notify_published(metadata, brief, result, cost, alerts, extended is not None)
-        return {"status": "PUBLISHED", "date": self.date, "has_aisle_variant": extended is not None, "cost": cost, **result}
+        return {"status": "PUBLISHED", "date": self.date, "title": metadata.get("title"), "has_aisle_variant": extended is not None, "cost": cost, **result}
 
     # ── safe mode ──────────────────────────────────────────────────────────
     def _safe_mode(self, brief: dict, aisle_brief: dict, script_result: dict, editor_result: dict, approved_aisle_script: Optional[str]) -> dict[str, Any]:
@@ -247,6 +340,16 @@ class EpisodeRun:
                 brief["stories"], aisle_brief.get("stories", []), None, extended, None, editor_result.get("hallucinations", []), cost, _run_url(),
             )
             cfo.record_episode_cost(s, self.storage, self.date, cost)
+        safe_props = {
+            "title": script_result.get("metadata", {}).get("title"),
+            "story_count": brief.get("story_count", 0),
+            "hallucinations": len(editor_result.get("hallucinations", [])),
+            "flagged": editor_result.get("hallucinations", [])[:8],
+            "has_aisle_variant": extended is not None,
+            **_cost_props(cost),
+        }
+        self.analytics.capture("episode_safe_mode", **safe_props)
+        self.analytics.identify_episode(status="SAFE_MODE", **safe_props)
         headlines = "\n".join(f"• {esc(st['title'])}" for st in brief["stories"][:14])
         hall = "\n".join(f"• {esc(h)}" for h in editor_result.get("hallucinations", [])[:8])
         telegram(s, f"🟠 <b>Context Window {esc(self.date)} — SAFE MODE</b>\nEditor rejected the script. No main audio published.\n\n<b>Flagged:</b>\n{hall or '(none listed)'}\n\n<b>Headlines:</b>\n{headlines}")
@@ -273,6 +376,27 @@ class EpisodeRun:
         if alerts:
             lines.append("⚠️ " + "\n⚠️ ".join(esc(a) for a in alerts))
         telegram(self.settings, "\n".join(ln for ln in lines if ln is not None))
+
+
+def _flag_on(value: Any) -> bool:
+    """PostHog flags are bools or variant strings; any variant counts as on (like `feature_enabled`)."""
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "false", "off", "0"}
+    return bool(value)
+
+
+def _cost_props(cost: dict[str, Any]) -> dict[str, Any]:
+    if not cost:
+        return {}
+    return {
+        "cost_total_usd": cost.get("total_usd"),
+        "cost_llm_usd": cost.get("llm_usd"),
+        "cost_tts_usd": cost.get("tts_usd"),
+        "cost_serper_usd": cost.get("serper_usd"),
+        "cost_llm_by_agent": cost.get("llm_by_agent"),
+        "tts_chars": cost.get("tts_chars"),
+        "serper_queries": cost.get("serper_queries"),
+    }
 
 
 def run_episode(settings: Settings, episode_date: str) -> dict[str, Any]:

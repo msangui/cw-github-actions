@@ -87,6 +87,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           S3_BUCKET: ${{ vars.S3_BUCKET }}
           S3_PREFIX: ${{ vars.S3_PREFIX }}
           PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
@@ -102,6 +104,8 @@ jobs:
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           CLAIRE_VOICE_ID: ${{ vars.CLAIRE_VOICE_ID }}
           FLINT_VOICE_ID: ${{ vars.FLINT_VOICE_ID }}
           S3_BUCKET: ${{ vars.S3_BUCKET }}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pipeline.analytics import inject_web_snippet, web_snippet
 from pipeline.config import Settings
 from pipeline.llm import LLM
 from pipeline.log import get_logger
@@ -51,8 +52,10 @@ def stub_html(episode_date: str, stories: list[dict[str, Any]], listen_url: str 
 
 
 def generate_newsletter(settings: Settings, llm: LLM, script: str, stories: list[dict[str, Any]], episode_date: str, listen_url: str = "#") -> dict[str, Any]:
+    # PostHog web analytics for readers (page views + link clicks per episode); empty string when off.
+    snippet = web_snippet(settings, episode_date)
     if not llm.available:
-        return {"html": stub_html(episode_date, stories, listen_url), "episode_title": f"Context Window — {episode_date}", "token_usage": {}, "model": None}
+        return {"html": inject_web_snippet(stub_html(episode_date, stories, listen_url), snippet), "episode_title": f"Context Window — {episode_date}", "token_usage": {}, "model": None}
 
     stories_text = "\n".join(f"- {s['title']} ({s.get('source_name', '')}) {s.get('url', '')}" for s in stories[:14])
     user = f"Episode date: {episode_date}\n\nStories from the curator brief:\n{stories_text}\n\nFull script:\n{script[:16000]}\n\nReturn only the JSON."
@@ -60,7 +63,7 @@ def generate_newsletter(settings: Settings, llm: LLM, script: str, stories: list
         result = llm.call_json("newsletter", user, schema=NEWSLETTER_SCHEMA)
     except Exception as e:
         log.warning("Newsletter extraction failed, using stub", error=str(e)[:200])
-        return {"html": stub_html(episode_date, stories, listen_url), "episode_title": f"Context Window — {episode_date}", "token_usage": {}, "model": None}
+        return {"html": inject_web_snippet(stub_html(episode_date, stories, listen_url), snippet), "episode_title": f"Context Window — {episode_date}", "token_usage": {}, "model": None}
 
     d = result.data
     blocks = [
@@ -83,4 +86,4 @@ def generate_newsletter(settings: Settings, llm: LLM, script: str, stories: list
         listen_url=listen_url,
     )
     log.info("Newsletter rendered", stories=len(blocks))
-    return {"html": render_newsletter(data), "episode_title": data.episode_title, "token_usage": result.token_usage, "model": result.model}
+    return {"html": inject_web_snippet(render_newsletter(data), snippet), "episode_title": data.episode_title, "token_usage": result.token_usage, "model": result.model}

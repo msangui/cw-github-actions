@@ -109,6 +109,7 @@ def publish_episode(
         "audio_url": audio.get("standard", {}).get("url"),
         "extended_audio_url": audio.get("extended", {}).get("url"),
         "newsletter_url": storage.public_url(newsletter_key) if newsletter_key else None,
+        "audio_duration_seconds": audio.get("standard", {}).get("duration_seconds"),
         "feeds": feeds,
     }
     log.info("Episode published", **{k: v for k, v in result.items() if k != "feeds"}, feeds=list(feeds.values()))

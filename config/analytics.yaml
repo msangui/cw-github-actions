@@ -1,0 +1,40 @@
+# PostHog: product analytics, LLM analytics, error tracking and feature flags.
+# Inert until POSTHOG_API_KEY (project API key, phc_...) is set; POSTHOG_HOST defaults to the US cloud.
+# Nothing here can fail a run — PostHog being down just means no events and default flag values.
+enabled: true
+
+# The "person" every pipeline event belongs to. There are no end users; this is the pipeline itself.
+distinct_id: context-window-pipeline
+# PostHog group type; one group per episode date, so any insight can be broken down per episode.
+group_type: episode
+# false = anonymous events (cheaper, no person profile). Flags still evaluate against distinct_id.
+person_profiles: false
+
+llm_analytics:
+  enabled: true
+  # Include prompt + response text on $ai_generation events ($ai_input / $ai_output_choices).
+  # Off by default: the same text is already in the run artifact under llm_logs/, and the
+  # writer's prompt is large. Turn on when debugging generations from the PostHog UI.
+  send_prompts: false
+  # One $ai_span per executed pipeline stage (ingest, curator, writer, tts, stitch, ...) inside the run trace.
+  stage_spans: true
+
+error_tracking: true
+
+# Operational switches evaluated once at run start. Create flags with these keys in PostHog;
+# a missing flag simply means "default behaviour". Roll out to 100% to flip the switch —
+# no commit, no workflow edit, works from the phone.
+feature_flags:
+  enabled: true
+  paused: cw-pipeline-paused             # true  -> run exits with status PAUSED (emergency stop)
+  aisle_enabled: cw-aisle-enabled        # false -> skip The Aisle segment
+  force_dry_run: cw-force-dry-run        # true  -> text-only run, no TTS/publish (prompt tuning)
+  # JSON payload on this flag overrides agent tunables without a commit, e.g.
+  #   {"writer": {"model": "claude-sonnet-5", "effort": "high"}, "editor": {"max_tokens": 12000}}
+  # Only model / effort / max_tokens / temperature are accepted; prompts stay in git.
+  agent_overrides: cw-agent-overrides
+
+newsletter:
+  # Inject posthog-js into newsletter.html: page views, time on page and clicks on story /
+  # deep-dive links, each tagged with episode_date. Readers stay anonymous.
+  web_snippet: true

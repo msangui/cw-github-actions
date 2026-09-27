@@ -35,8 +35,14 @@ Entry point: `python -m pipeline <run|rebuild-feed|check-config>` (`pipeline/cli
   schema, retries, per-call logs. Models are the Claude 5 family (`claude-opus-5` default); the 1.x
   `anthropic` SDK has no `temperature` kwarg — legacy models get it via `extra_body`.
 - **Degrade, don't crash, on optional services**: no OpenAI key → title-overlap dedup; no Serper →
-  coverage 1; no Telegram → silent; no Anthropic key → stub script + auto-approve (used by CI).
-  Missing ElevenLabs key or ffmpeg is fatal only after the text stages.
+  coverage 1; no Telegram → silent; no Anthropic key → stub script + auto-approve (used by CI);
+  no PostHog key → no events, flags at defaults. Missing ElevenLabs key or ffmpeg is fatal only
+  after the text stages.
+- **PostHog goes through `pipeline/analytics.py`** only, and is best-effort: every method swallows its
+  own errors. Events are grouped by `episode` (key = date); Claude calls emit `$ai_generation` from
+  `llm.py`; stages emit `$ai_span`. Feature flags are evaluated once at run start and may only flip
+  operational switches (pause, aisle, dry run) or agent `model/effort/max_tokens/temperature` —
+  never prompts. Flag keys and switches live in `config/analytics.yaml`.
 - **Editorial content is load-bearing**: host personas, the verbatim sign-off lines, the
   `# SECTION:READ_THESE` marker (stitch uses it to splice The Aisle), voice settings and the duck curve.
   Change them deliberately, in YAML, and mention it in the commit.

@@ -32,7 +32,7 @@ feed and pings you on Telegram. Zero servers.
 | `tool_configs` table (sources, voices, stitch params) | `config/sources.yaml`, `config/voices.yaml`, `config/stitch.yaml` |
 | `episodes` / `episode_assets` tables | `episodes/<date>/episode.json` + files in S3 |
 | `headlines` + `memory_entries` (pgvector) | `state/memory.json` — 21-day title/URL dedup, optional OpenAI embeddings with cosine distance |
-| `llm_logs` table | `output/episodes/<date>/llm_logs/*.json`, uploaded as a run artifact |
+| `llm_logs` table | `output/episodes/<date>/llm_logs/*.json`, uploaded as a run artifact — plus PostHog LLM analytics when `POSTHOG_API_KEY` is set |
 | CFO cost tracking (`cost_usd`) | `state/costs.json` + `config/budget.yaml` thresholds; monthly hard-pause still enforced |
 | Redis Serper cache | Dropped (one run per day; Serper calls are parallelized instead) |
 | FastAPI admin API + Next.js UI | Git. Edit YAML, commit, next run picks it up. Manual triggers via `workflow_dispatch`. |
@@ -83,6 +83,7 @@ Secrets:
 | `OPENAI_API_KEY` | optional — semantic dedup of headlines |
 | `SERPER_API_KEY` | optional — cross-coverage scoring |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | optional — operator notifications |
+| `POSTHOG_API_KEY` | optional — run analytics, LLM analytics, error tracking, feature flags (see [Observability](#observability-posthog)); pair with the `POSTHOG_HOST` variable for EU/self-hosted |
 
 ### 3. Podcast metadata
 
@@ -187,6 +188,27 @@ s3://<bucket>/[prefix/]
 
 ---
 
+## Observability (PostHog)
+
+Optional. Set the `POSTHOG_API_KEY` secret (project API key, `phc_…`) and, for EU cloud or self-hosted,
+the `POSTHOG_HOST` variable. Without a key nothing is sent and every flag falls back to its default — that
+is what CI and local dry runs get. Tunables live in `config/analytics.yaml`; the code is `pipeline/analytics.py`
+and it can never fail a run (PostHog down = no events, default flags).
+
+| PostHog product | What the pipeline sends | What you get |
+|---|---|---|
+| **Product analytics** | `episode_run_started/finished`, `episode_status_changed`, `pipeline_stage_completed/failed`, `episode_published`, `episode_safe_mode`, `episode_paused`, `budget_alert` — every event grouped under an `episode` group keyed by date and carrying cost, story/word counts, TTS reuse, GitHub run id and trigger | Trends of cost per episode and per agent, stage durations, safe-mode rate, checkpoint resumes, alerts on a failed run or a spend spike; a group page per episode |
+| **LLM analytics** | One `$ai_generation` per Claude call (agent, model, tokens incl. cache, latency, stop reason, errors), one `$ai_span` per stage and one `$ai_trace` per run sharing `$ai_trace_id` | Per-agent cost/latency/token dashboards, traces of a whole episode, error rate by model. Prompts and responses are **not** sent unless `llm_analytics.send_prompts: true` |
+| **Error tracking** | `capture_exception` for the exception that fails a run, tagged with the stage and status | Grouped, deduplicated failures with stack traces instead of grepping Actions logs |
+| **Feature flags** | Evaluated once at run start: `cw-pipeline-paused` (emergency stop → status `PAUSED`), `cw-aisle-enabled`, `cw-force-dry-run`, and `cw-agent-overrides` whose JSON payload overrides `model` / `effort` / `max_tokens` / `temperature` per agent | Flip operational switches or canary a cheaper model from your phone — no commit, no workflow edit. Prompts stay in git. Active flags are stamped on every event as `$feature/<key>` |
+| **Web analytics** | `posthog-js` injected into `newsletter.html` with `episode_date` registered | Page views, time on page and clicks on story / deep-dive links per episode; readers stay anonymous |
+
+Session replay, surveys and heatmaps don't apply — there is no app UI.
+
+Create the flags in PostHog with exactly the keys above (or rename them in `config/analytics.yaml`); a
+missing flag means default behaviour. Payload for `cw-agent-overrides`, for example:
+`{"writer": {"model": "claude-sonnet-5", "effort": "high"}}`.
+
 ## Costs
 
 Defaults use `claude-opus-5` for every agent (`config/agents/*.yaml`); switch individual agents to
@@ -205,6 +227,7 @@ pipeline/
   workflow.py       orchestration, status machine, safe mode, notifications
   cli.py            run / rebuild-feed / check-config
   config.py         env settings + YAML loaders
+  analytics.py      PostHog: events, LLM analytics, error tracking, feature flags (no-op without a key)
   llm.py            Claude calls (streaming, structured outputs, retries, logs)
   storage.py        S3 or local directory
   checkpoint.py     stage checkpoints
@@ -212,7 +235,7 @@ pipeline/
   feed.py           RSS/iTunes feed builder
   stages/           ingest, coverage, curator, aisle_curator, writer, aisle_writer,
                     editor, tts, stitch, newsletter(+template), cfo, publish
-config/             podcast, sources, voices, stitch, budget, curation, agents/*.yaml
+config/             podcast, sources, voices, stitch, budget, curation, analytics, agents/*.yaml
 assets/             intro.mp3 (jingle), cover.png (placeholder artwork)
 infra/              setup-aws.sh + IAM/bucket policy templates
 tests/              unit tests + ffmpeg-backed audio/publish tests

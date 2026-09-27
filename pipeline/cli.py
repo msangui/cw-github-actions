@@ -66,6 +66,7 @@ def cmd_check_config(_: argparse.Namespace) -> int:
         "openai_api_key (optional)": bool(s.openai_api_key),
         "serper_api_key (optional)": bool(s.serper_api_key),
         "telegram (optional)": bool(s.telegram_bot_token and s.telegram_chat_id),
+        "posthog (optional)": f"{s.posthog_host}" if s.posthog_api_key else False,
         "storage": f"s3://{s.s3_bucket}/{s.s3_prefix}" if s.uses_s3 else f"local:{s.local_site_dir}",
         "public_base_url": s.resolved_public_base_url,
         "intro_mp3": s.intro_mp3_path.exists(),

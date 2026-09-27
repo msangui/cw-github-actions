@@ -46,6 +46,10 @@ class Settings:
     telegram_bot_token: str = field(default_factory=lambda: _env("TELEGRAM_BOT_TOKEN"))
     telegram_chat_id: str = field(default_factory=lambda: _env("TELEGRAM_CHAT_ID"))
 
+    # PostHog (optional): analytics, LLM observability, error tracking, feature flags
+    posthog_api_key: str = field(default_factory=lambda: _env("POSTHOG_API_KEY"))
+    posthog_host: str = field(default_factory=lambda: _env("POSTHOG_HOST", "https://us.i.posthog.com").rstrip("/"))
+
     # Storage
     s3_bucket: str = field(default_factory=lambda: _env("S3_BUCKET"))
     aws_region: str = field(default_factory=lambda: _env("AWS_REGION", _env("AWS_DEFAULT_REGION", "us-east-1")))
@@ -67,6 +71,10 @@ class Settings:
     skip_publish: bool = False     # produce audio but do not upload / touch feeds
     skip_aisle: bool = False
     fresh: bool = False            # ignore checkpoints
+
+    # Per-agent tunable overrides (model / effort / max_tokens / temperature) layered over
+    # config/agents/*.yaml. Filled from the PostHog `agent_overrides` flag payload at run start.
+    agent_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # ── derived ─────────────────────────────────────────────────────────────
     @property
@@ -90,8 +98,12 @@ class Settings:
         return _load_yaml_cached(str(self.config_dir / f"{name}.yaml"))
 
     def agent(self, key: str) -> dict[str, Any]:
-        """Config for one agent (config/agents/<key>.yaml)."""
-        return _load_yaml_cached(str(self.config_dir / "agents" / f"{key}.yaml"))
+        """Config for one agent (config/agents/<key>.yaml), with any runtime overrides applied."""
+        cfg = _load_yaml_cached(str(self.config_dir / "agents" / f"{key}.yaml"))
+        override = self.agent_overrides.get(key) if self.agent_overrides else None
+        if cfg and override:
+            return {**cfg, **override}  # copy: never mutate the cached YAML
+        return cfg
 
     def voice(self, speaker: str) -> dict[str, Any]:
         voices = self.load_yaml("voices")

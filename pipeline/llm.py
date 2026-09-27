@@ -65,9 +65,10 @@ def _supports_sampling(model: str) -> bool:
 
 
 class LLM:
-    def __init__(self, settings: Settings, log_dir: Optional[Path] = None):
+    def __init__(self, settings: Settings, log_dir: Optional[Path] = None, analytics: Optional[Any] = None):
         self.settings = settings
         self.log_dir = log_dir
+        self.analytics = analytics  # pipeline.analytics.Analytics; every call becomes an $ai_generation event
         self._client: Optional[anthropic.Anthropic] = None
 
     @property
@@ -114,6 +115,9 @@ class LLM:
             # The 1.x SDK dropped the temperature kwarg; older models (4.6 and below) still accept it on the wire.
             kwargs["extra_body"] = {"temperature": float(cfg["temperature"])}
 
+        model_parameters = {k: v for k, v in (("max_tokens", max_tokens), ("effort", cfg.get("effort")), ("temperature", (kwargs.get("extra_body") or {}).get("temperature")), ("structured_output", schema is not None)) if v is not None}
+        messages_for_analytics = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}]
+
         last_error: Optional[Exception] = None
         for attempt in range(1, max_attempts + 1):
             started = time.time()
@@ -122,22 +126,27 @@ class LLM:
                     message = stream.get_final_message()
             except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError) as e:
                 last_error = e
+                self._track_generation(agent_key, model, time.time() - started, attempt, model_parameters, messages_for_analytics, error=e)
                 wait = min(60, 5 * 2 ** (attempt - 1))
                 log.warning("Transient API error, retrying", agent=agent_key, attempt=attempt, wait_s=wait, error=str(e)[:200])
                 time.sleep(wait)
                 continue
             except anthropic.BadRequestError as e:
+                self._track_generation(agent_key, model, time.time() - started, attempt, model_parameters, messages_for_analytics, error=e)
                 # Structured outputs / effort may not be supported on a custom model — retry once without them.
                 if output_config and attempt == 1:
                     log.warning("Bad request; retrying without output_config", agent=agent_key, error=str(e)[:200])
                     kwargs.pop("output_config", None)
                     output_config = {}
+                    model_parameters.pop("effort", None)
+                    model_parameters["structured_output"] = False
                     continue
                 raise LLMError(f"{agent_key}: bad request: {e}") from e
 
             raw_text = "".join(block.text for block in message.content if block.type == "text")
             usage = message.usage
             duration = round(time.time() - started, 1)
+            self._track_generation(agent_key, model, duration, attempt, model_parameters, messages_for_analytics, message=message, raw_text=raw_text)
             log.info(
                 "LLM call complete",
                 agent=agent_key,
@@ -174,6 +183,42 @@ class LLM:
             )
 
         raise LLMError(f"{agent_key}: failed after {max_attempts} attempts: {last_error}")
+
+    def _track_generation(
+        self,
+        agent_key: str,
+        model: str,
+        latency_s: float,
+        attempt: int,
+        model_parameters: dict[str, Any],
+        messages: list[dict[str, Any]],
+        message: Any = None,
+        raw_text: Optional[str] = None,
+        error: Optional[Exception] = None,
+    ) -> None:
+        """Emit one PostHog `$ai_generation` per API round-trip. Never raises."""
+        if self.analytics is None:
+            return
+        try:
+            usage = getattr(message, "usage", None)
+            self.analytics.generation(
+                agent=agent_key,
+                model=model,
+                latency_s=latency_s,
+                input_tokens=getattr(usage, "input_tokens", None),
+                output_tokens=getattr(usage, "output_tokens", None),
+                cache_read_tokens=getattr(usage, "cache_read_input_tokens", None),
+                cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", None),
+                stop_reason=getattr(message, "stop_reason", None),
+                http_status=getattr(error, "status_code", None) if error is not None else 200,
+                error=f"{type(error).__name__}: {error}" if error is not None else None,
+                model_parameters=model_parameters,
+                messages=messages,
+                output_text=raw_text,
+                attempt=attempt,
+            )
+        except Exception as e:  # analytics must never break a generation
+            log.warning("Could not record generation analytics", agent=agent_key, error=str(e)[:200])
 
     def _save_log(self, agent_key: str, model: str, prompt: str, response: str, in_tok: int, out_tok: int, stop_reason: str | None) -> None:
         """Replaces the llm_logs table: one JSON file per call in the episode output dir."""
