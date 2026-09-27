@@ -93,15 +93,17 @@ def test_cfo_cost_and_thresholds(settings):
     cost = cfo.estimate_cost(
         settings,
         [("writer", "claude-opus-5", {"input_tokens": 10_000, "output_tokens": 6_000}), ("editor", "claude-sonnet-5", {"input_tokens": 10_000, "output_tokens": 1_000})],
-        tts_chars=20_000,
+        tts_chars=50_000,
         serper_queries=100,
     )
+    rate = float(settings.load_yaml("budget")["pricing"]["elevenlabs_per_1k_chars"])
     assert cost["llm_by_agent"]["writer"] == round(10_000 / 1e6 * 5 + 6_000 / 1e6 * 25, 4)
-    assert cost["tts_usd"] == 6.6
+    assert cost["tts_usd"] == round(50 * rate, 4)
     assert cost["serper_usd"] == 0.1
+    assert cost["total_usd"] > 6.0, "test needs to cross the daily breakdown threshold"
     storage = Storage(settings)
     alerts = cfo.record_episode_cost(settings, storage, "2026-09-26", cost)
-    assert any("Daily spend" in a for a in alerts)  # 6.6 + llm > 6.0 breakdown threshold
+    assert any("Daily spend" in a for a in alerts)
     assert cfo.check_budget_before_run(settings, storage) == cost["total_usd"]
     storage.put_json(cfo.COSTS_KEY, {"episodes": {"2026-09-01": {"total_usd": 200}}})
     from datetime import date
