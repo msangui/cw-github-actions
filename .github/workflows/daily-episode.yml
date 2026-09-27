@@ -1,11 +1,15 @@
 name: Daily episode
 
+# No cron: episodes are triggered from outside (intended cadence: Tuesday and Thursday).
+#   - From the Actions tab or `gh workflow run daily-episode.yml`
+#   - From any external scheduler via repository_dispatch:
+#       curl -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+#         https://api.github.com/repos/msangui/cw-github-actions/dispatches \
+#         -d '{"event_type":"produce-episode","client_payload":{"dry_run":false}}'
+#     (client_payload accepts the same keys as the workflow_dispatch inputs below)
 on:
-  # Scheduled runs are disabled while the pipeline is being tested. To enable, uncomment:
-  # Mon/Wed/Fri. GitHub cron is UTC: 06:00 UTC = 03:00 America/Argentina/Buenos_Aires.
-  # Scheduled runs can lag by up to ~30 minutes.
-  # schedule:
-  #   - cron: "0 6 * * 1,3,5"
+  repository_dispatch:
+    types: [produce-episode]
   workflow_dispatch:
     inputs:
       episode_date:
@@ -105,12 +109,18 @@ jobs:
           PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           CW_IGNORE_BUDGET: ${{ vars.CW_IGNORE_BUDGET || '0' }}
+          # workflow_dispatch inputs, or repository_dispatch client_payload, whichever fired
+          IN_DATE: ${{ inputs.episode_date || github.event.client_payload.episode_date || '' }}
+          IN_DRY_RUN: ${{ inputs.dry_run || github.event.client_payload.dry_run || 'false' }}
+          IN_FRESH: ${{ inputs.fresh || github.event.client_payload.fresh || 'false' }}
+          IN_SKIP_AISLE: ${{ inputs.skip_aisle || github.event.client_payload.skip_aisle || 'false' }}
         run: |
           ARGS=""
-          if [ -n "${{ inputs.episode_date }}" ]; then ARGS="$ARGS --date ${{ inputs.episode_date }}"; fi
-          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
-          if [ "${{ inputs.fresh }}" = "true" ]; then ARGS="$ARGS --fresh"; fi
-          if [ "${{ inputs.skip_aisle }}" = "true" ]; then ARGS="$ARGS --skip-aisle"; fi
+          if [ -n "$IN_DATE" ]; then ARGS="$ARGS --date $IN_DATE"; fi
+          if [ "$IN_DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "$IN_FRESH" = "true" ]; then ARGS="$ARGS --fresh"; fi
+          if [ "$IN_SKIP_AISLE" = "true" ]; then ARGS="$ARGS --skip-aisle"; fi
+          echo "trigger=${{ github.event_name }} args=$ARGS"
           python -m pipeline run $ARGS --github-output "$GITHUB_OUTPUT"
 
       - name: Summary

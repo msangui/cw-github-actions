@@ -14,7 +14,7 @@ RSS feeds ─▶ Ingest ─▶ Coverage (Serper) ─▶ Curator ─▶ Writer �
                                                             s3://bucket/feed.xml   ◀── submit this to Spotify
 ```
 
-Monday, Wednesday and Friday at 06:00 UTC (03:00 Buenos Aires) the workflow wakes up, reads ~50 RSS feeds, scores and
+Each time it is triggered (intended cadence: Tuesday and Thursday, from an external scheduler) the workflow reads ~50 RSS feeds, scores and
 dedups stories, has Claude write a FLINT/CLAIRE dialogue script and fact-check it, voices it line by
 line with ElevenLabs, mixes the intro jingle, normalizes to -16 LUFS, uploads to S3, regenerates the
 feed and pings you on Telegram. Zero servers.
@@ -27,7 +27,7 @@ feed and pings you on Telegram. Zero servers.
 |---|---|
 | Temporal workflow + activities | `pipeline/workflow.py` — plain Python, sequential with a couple of thread pools |
 | Temporal retries / replay | Per-stage **checkpoints** in `work/<date>/` (S3). A re-run resumes where it failed. |
-| Temporal cron schedule | `on: schedule` in `.github/workflows/daily-episode.yml` (Mon/Wed/Fri; currently commented out while testing) |
+| Temporal cron schedule | External trigger: `workflow_dispatch` (Actions tab / `gh`) or `repository_dispatch` webhook. No cron in the repo. |
 | `agent_configs` table (prompts, models) | `config/agents/*.yaml` |
 | `tool_configs` table (sources, voices, stitch params) | `config/sources.yaml`, `config/voices.yaml`, `config/stitch.yaml` |
 | `episodes` / `episode_assets` tables | `episodes/<date>/episode.json` + files in S3 |
@@ -92,7 +92,9 @@ Replace `assets/cover.png` with real 1400–3000 px square artwork when you have
 
 ### 4. First episode
 
-Actions → **Daily episode** → *Run workflow*. Tick **dry_run** the first time to see the script and cost
+Actions → **Daily episode** → *Run workflow*. There is no cron; trigger it from your own scheduler with
+`gh workflow run daily-episode.yml` or a `repository_dispatch` call (see the header of the workflow file
+for the exact `curl`; a fine-grained PAT with *Actions: write* on this repo is enough). Tick **dry_run** the first time to see the script and cost
 without spending on TTS; the run artifact contains `brief.json`, `script.txt`, `cost.json` and every LLM
 call. Then run it for real. The job summary links the MP3, newsletter and feed URL.
 
@@ -142,7 +144,7 @@ Run flags (`python -m pipeline run --help`):
 
 1. **Budget gate** — refuses to start if `state/costs.json` says this month already hit the hard-pause
    threshold (`config/budget.yaml`, default $145). Override with `CW_IGNORE_BUDGET=1`.
-2. **Ingest** (main + Aisle feeds in parallel, 72 h window) → **Coverage** (Serper, top 150 stories).
+2. **Ingest** (main + Aisle feeds in parallel, 120 h window) → **Coverage** (Serper, top 150 stories).
 3. **Curate** — deterministic score (recency + tier + coverage) → 3-layer dedup → top 14 → Claude
    writes the editorial brief (order, 60/90/120 s allocations, comedy angles, deep-dive picks, cold open).
 4. **Write** — Claude produces the script + metadata as structured JSON; validated for `CLAIRE:`/`FLINT:`
