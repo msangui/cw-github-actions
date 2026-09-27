@@ -1,7 +1,8 @@
 # RSS sources. Replaces tool_configs.rss_sources / aisle_sources.
 # tier "0" = lab-direct (auto-include, +3 score); "1" = original sources (+1); "2" = other.
 # Set active: false to keep a source in the list without fetching it.
-window_hours: 48
+# 72h so a Mon/Wed/Fri cadence never misses the weekend (Fri -> Mon gap)
+window_hours: 72
 max_entries_per_feed: 50
 
 main:

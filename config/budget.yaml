@@ -8,8 +8,9 @@ pricing:
     claude-sonnet-4: { input: 3.00,  output: 15.00 }
     claude-haiku-4:  { input: 1.00,  output: 5.00 }
     default:         { input: 5.00,  output: 25.00 }
-  # USD per 1K characters (ElevenLabs Creator plan effective rate)
-  elevenlabs_per_1k_chars: 0.33
+  # USD per 1K characters, marginal: Creator-plan overage is $0.30 per 1K credits and
+  # eleven_turbo_v2_5 uses 0.5 credits/char. The $25 subscription itself is not per-episode.
+  elevenlabs_per_1k_chars: 0.15
   # USD per Serper query
   serper_per_query: 0.001
 

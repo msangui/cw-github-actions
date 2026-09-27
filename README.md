@@ -14,7 +14,7 @@ RSS feeds ─▶ Ingest ─▶ Coverage (Serper) ─▶ Curator ─▶ Writer �
                                                             s3://bucket/feed.xml   ◀── submit this to Spotify
 ```
 
-Every weekday at 06:00 UTC (03:00 Buenos Aires) the workflow wakes up, reads ~50 RSS feeds, scores and
+Monday, Wednesday and Friday at 06:00 UTC (03:00 Buenos Aires) the workflow wakes up, reads ~50 RSS feeds, scores and
 dedups stories, has Claude write a FLINT/CLAIRE dialogue script and fact-check it, voices it line by
 line with ElevenLabs, mixes the intro jingle, normalizes to -16 LUFS, uploads to S3, regenerates the
 feed and pings you on Telegram. Zero servers.
@@ -27,7 +27,7 @@ feed and pings you on Telegram. Zero servers.
 |---|---|
 | Temporal workflow + activities | `pipeline/workflow.py` — plain Python, sequential with a couple of thread pools |
 | Temporal retries / replay | Per-stage **checkpoints** in `work/<date>/` (S3). A re-run resumes where it failed. |
-| Temporal cron schedule | `on: schedule` in `.github/workflows/daily-episode.yml` |
+| Temporal cron schedule | `on: schedule` in `.github/workflows/daily-episode.yml` (Mon/Wed/Fri; currently commented out while testing) |
 | `agent_configs` table (prompts, models) | `config/agents/*.yaml` |
 | `tool_configs` table (sources, voices, stitch params) | `config/sources.yaml`, `config/voices.yaml`, `config/stitch.yaml` |
 | `episodes` / `episode_assets` tables | `episodes/<date>/episode.json` + files in S3 |
@@ -142,7 +142,7 @@ Run flags (`python -m pipeline run --help`):
 
 1. **Budget gate** — refuses to start if `state/costs.json` says this month already hit the hard-pause
    threshold (`config/budget.yaml`, default $145). Override with `CW_IGNORE_BUDGET=1`.
-2. **Ingest** (main + Aisle feeds in parallel, 48 h window) → **Coverage** (Serper, top 150 stories).
+2. **Ingest** (main + Aisle feeds in parallel, 72 h window) → **Coverage** (Serper, top 150 stories).
 3. **Curate** — deterministic score (recency + tier + coverage) → 3-layer dedup → top 14 → Claude
    writes the editorial brief (order, 60/90/120 s allocations, comedy angles, deep-dive picks, cold open).
 4. **Write** — Claude produces the script + metadata as structured JSON; validated for `CLAIRE:`/`FLINT:`
