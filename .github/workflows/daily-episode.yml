@@ -1,10 +1,11 @@
 name: Daily episode
 
 on:
-  schedule:
-    # GitHub cron is UTC. 06:00 UTC = 03:00 America/Argentina/Buenos_Aires (the original
-    # pipeline's start time). Scheduled runs can lag by up to ~30 minutes.
-    - cron: "0 6 * * 1-5"
+  # Scheduled runs are disabled while the pipeline is being tested. To enable, uncomment:
+  # GitHub cron is UTC. 06:00 UTC = 03:00 America/Argentina/Buenos_Aires (the original
+  # pipeline's start time). Scheduled runs can lag by up to ~30 minutes.
+  # schedule:
+  #   - cron: "0 6 * * 1-5"
   workflow_dispatch:
     inputs:
       episode_date:
