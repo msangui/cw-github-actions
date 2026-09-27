@@ -31,6 +31,12 @@ Entry point: `python -m pipeline <run|rebuild-feed|check-config>` (`pipeline/cli
   JSON-serializable (no Paths, no datetimes) so checkpoints round-trip.
 - **Prompts and tunables are YAML**, not code: `config/agents/*.yaml`, `config/*.yaml`. Don't hardcode a
   prompt, model, voice ID or threshold in Python.
+- **Hosts and dynamics live in `config/show.yaml`** and are rendered into the `{{SHOW}}` slot of
+  `writer.yaml` / `aisle_writer.yaml` by `pipeline/show.py`. `admin/lib/compile-prompt.ts` is a port of
+  it; both must reproduce `tests/fixtures/compiled_writer_prompt.txt` (regenerate the fixture when
+  show.yaml or the writer prompt changes, and keep the two implementations in step).
+- **`pipeline/log.py` may report to the admin panel** (`PANEL_URL` + `PANEL_TOKEN`): batched, background
+  thread, never raises. Emit run-level facts via `panel.event(...)` from `workflow.py`, not ad hoc HTTP.
 - **Claude calls go through `pipeline/llm.py`** (`LLM.call_json`): streaming, structured-output JSON
   schema, retries, per-call logs. Models are the Claude 5 family (`claude-opus-5` default); the 1.x
   `anthropic` SDK has no `temperature` kwarg — legacy models get it via `extra_body`.
@@ -41,6 +47,14 @@ Entry point: `python -m pipeline <run|rebuild-feed|check-config>` (`pipeline/cli
   `# SECTION:READ_THESE` marker (stitch uses it to splice The Aisle), voice settings and the duck curve.
   Change them deliberately, in YAML, and mention it in the commit.
 
+## Admin panel (`admin/`)
+
+Separate Next.js app (Vercel, Clerk). It only talks to this repo through the GitHub API (read config,
+commit, `workflow_dispatch`) and receives run events at `POST /api/runs/{id}/events`. Editable files are
+allow-listed in `admin/lib/config-files.ts`; edits are comment-preserving YAML patch ops
+(`admin/lib/yaml-patch.ts`). Checks: `cd admin && npm run typecheck && npm test && npm run build`.
+Contract and setup: `admin/README.md`.
+
 ## Status machine
 
 `INGESTING → CURATING → WRITING → EDITING → GENERATING_AUDIO → STITCHING → PUBLISHING → PUBLISHED`
@@ -50,5 +64,7 @@ with exits `SAFE_MODE` (editor rejected), `DRY_RUN`, `AUDIO_READY` (`--no-publis
 ## Testing
 
 `tests/` covers scoring, dedup/memory, script validation and parsing, marker restoration, feed XML,
-storage/checkpoints, CFO math, and (with ffmpeg) real stitching + publishing using synthetic tone MP3s.
+storage/checkpoints, CFO math, the show.yaml prompt compiler (bands, placeholder, sign-offs, golden
+fixture), the panel reporter (batching, auth header, fail-safety), and (with ffmpeg) real stitching +
+publishing using synthetic tone MP3s.
 Add a test when changing any of those; live-network behaviour is covered by the CI smoke run.

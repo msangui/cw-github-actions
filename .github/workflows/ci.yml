@@ -25,3 +25,28 @@ jobs:
       # scoring, dedup, stub writer/editor and local storage end-to-end.
       - name: Smoke run (no keys, local storage, dry run)
         run: python -m pipeline run --dry-run --skip-aisle
+
+  admin:
+    name: Admin panel (typecheck, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # Parity test: the TypeScript prompt compiler must match tests/fixtures/compiled_writer_prompt.txt
+      - run: npm test
+      - run: npm run build
+        env:
+          # Placeholder keys so the build can render Clerk components; no network calls are made.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+          CLERK_SECRET_KEY: sk_test_placeholder
+          NEXT_TELEMETRY_DISABLED: "1"

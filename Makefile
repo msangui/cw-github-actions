@@ -6,7 +6,7 @@ install:
 	pip install -e ".[dev]"
 
 test:
-	pytest -q
+	python -m pytest -q
 
 lint:
 	ruff check pipeline tests
