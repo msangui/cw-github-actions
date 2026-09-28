@@ -29,7 +29,7 @@ Set `DRY_RUN = "true"` in `wrangler.toml` first so the test run costs only the C
 ```bash
 npx wrangler dev --test-scheduled
 # in another terminal — pick the cron that is 06:00 local right now (10 in summer, 11 in winter):
-curl "http://localhost:8787/__scheduled?cron=0+11+*+*+2,4"
+curl "http://localhost:8787/__scheduled?cron=0+11+*+*+3,5"
 ```
 
 A run should appear in the repo's Actions tab within seconds with trigger `repository_dispatch`.
@@ -40,3 +40,5 @@ dashboard's *Triggers → Cron Triggers → Run now* (button availability varies
 
 Edit `crons` in `wrangler.toml` (UTC) and `LOCAL_HOUR`, then `npx wrangler deploy`.
 Keep two crons one hour apart when the target is a US timezone so DST keeps working.
+Weekday numbers on Cloudflare run 1-7 from **Sunday** (1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu,
+6=Fri, 7=Sat), not the 0-6 of standard cron. Check the dashboard's "Runs" text after deploying.
