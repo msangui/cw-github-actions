@@ -1,0 +1,47 @@
+name: Probe sources
+
+# Diagnostic for the data-sources spike: fetches every feed in config/sources.yaml (and optionally a
+# candidates file) from a GitHub runner and reports which are dead, stale, headline-only or full-text.
+# Manual only; never touches S3 or the episode pipeline.
+on:
+  workflow_dispatch:
+    inputs:
+      candidates_file:
+        description: "Optional YAML list of {name,url} candidate feeds to probe as well"
+        required: false
+        default: "docs/spikes/candidate-feeds.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -q -e .
+      - name: Probe feeds
+        run: |
+          EXTRA=""
+          if [ -n "${{ inputs.candidates_file }}" ] && [ -f "${{ inputs.candidates_file }}" ]; then
+            EXTRA="--extra-file ${{ inputs.candidates_file }}"
+          fi
+          python scripts/probe_sources.py --json probe.json --md probe.md $EXTRA
+      - name: Summary
+        if: always()
+        run: |
+          { echo "## Source probe"; echo; cat probe.md; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-probe-${{ github.run_id }}
+          retention-days: 30
+          path: |
+            probe.json
+            probe.md
