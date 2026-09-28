@@ -1,0 +1,20 @@
+name = "context-window-trigger"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Cloudflare crons are UTC and ignore DST. 06:00 America/New_York is 10:00 UTC in
+# summer (EDT) and 11:00 UTC in winter (EST). We schedule both and the worker only
+# fires when the local hour is actually 6. Tue/Thu.
+[triggers]
+crons = ["0 10 * * 2,4", "0 11 * * 2,4"]
+
+[vars]
+GITHUB_REPO = "msangui/cw-github-actions"
+EVENT_TYPE = "produce-episode"
+TIMEZONE = "America/New_York"
+LOCAL_HOUR = "6"
+# Set to "true" to trigger text-only runs (no TTS / publish) while testing.
+DRY_RUN = "false"
+
+# Secret (not in this file): GH_TOKEN — fine-grained PAT with "Actions: Read and write"
+# on the repo. Set it with:  npx wrangler secret put GH_TOKEN
