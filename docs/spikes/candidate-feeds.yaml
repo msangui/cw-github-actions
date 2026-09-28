@@ -1,0 +1,69 @@
+# Candidate feeds from the data-sources spike (docs/spikes/2026-09-data-sources-ingestion.md).
+# Probed alongside config/sources.yaml by scripts/probe_sources.py / the "Probe sources" workflow.
+# Nothing here is used by the episode pipeline. Promote a row to config/sources.yaml once it probes OK.
+
+# ── Tier 0 replacements / corrections ────────────────────────────────────────
+- { name: "OpenAI News (canonical)",          url: "https://openai.com/news/rss.xml",                                      group: tier0 }
+- { name: "Anthropic News (taobojlen mirror)",url: "https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml", group: tier0 }
+- { name: "Anthropic Engineering (mirror)",   url: "https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_engineering_rss.xml", group: tier0 }
+- { name: "Claude blog (tim-hilde mirror)",   url: "https://tim-hilde.github.io/anthropic-rss/rss.xml",                    group: tier0 }
+- { name: "Google DeepMind (rss.xml)",        url: "https://deepmind.google/blog/rss.xml",                                 group: tier0 }
+- { name: "Google Research (new host)",       url: "https://research.google/blog/rss",                                     group: tier0 }
+- { name: "Meta AI (aabsinthium scraper)",    url: "https://aabsinthium.github.io/meta-ai-blog-rss/feed.xml",              group: tier0 }
+- { name: "Microsoft Research (canonical)",   url: "https://www.microsoft.com/en-us/research/feed/",                       group: tier0 }
+
+# ── Company blogs: fixed paths and scraped mirrors ───────────────────────────
+- { name: "Replicate blog (no .xml)",         url: "https://replicate.com/blog/rss",                                       group: labs }
+- { name: "Replicate changelog",              url: "https://replicate.com/changelog/rss",                                  group: labs }
+- { name: "Stability AI (blog?format=rss)",   url: "https://stability.ai/blog?format=rss",                                 group: labs }
+- { name: "xAI (Olshansk scrape)",            url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feed_xai_news.xml", group: labs }
+- { name: "Mistral (ATI scrape)",             url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/main/feeds/mistral-news.xml", group: labs }
+- { name: "Cohere (ATI scrape)",              url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/main/feeds/cohere-blog.xml", group: labs }
+
+# ── Community signal / curated aggregators ───────────────────────────────────
+- { name: "HN ≥100 points (hnrss)",           url: "https://hnrss.org/newest?points=100&count=100",                        group: signal }
+- { name: "Techmeme",                         url: "https://www.techmeme.com/feed.xml",                                    group: signal }
+- { name: "Lobste.rs ai tag",                 url: "https://lobste.rs/t/ai.rss",                                           group: signal }
+- { name: "Simon Willison (everything)",      url: "https://simonwillison.net/atom/everything/",                           group: signal }
+
+# ── Release feeds (GitHub releases.atom carries full notes) ──────────────────
+- { name: "anthropics/claude-code",           url: "https://github.com/anthropics/claude-code/releases.atom",              group: releases }
+- { name: "anthropics/anthropic-sdk-python",  url: "https://github.com/anthropics/anthropic-sdk-python/releases.atom",     group: releases }
+- { name: "openai/openai-agents-python",      url: "https://github.com/openai/openai-agents-python/releases.atom",         group: releases }
+- { name: "modelcontextprotocol/spec",        url: "https://github.com/modelcontextprotocol/modelcontextprotocol/releases.atom", group: releases }
+- { name: "modelcontextprotocol/python-sdk",  url: "https://github.com/modelcontextprotocol/python-sdk/releases.atom",     group: releases }
+- { name: "langchain-ai/langgraph",           url: "https://github.com/langchain-ai/langgraph/releases.atom",              group: releases }
+- { name: "vllm-project/vllm",                url: "https://github.com/vllm-project/vllm/releases.atom",                   group: releases }
+- { name: "huggingface/transformers",         url: "https://github.com/huggingface/transformers/releases.atom",            group: releases }
+- { name: "pydantic/pydantic-ai",             url: "https://github.com/pydantic/pydantic-ai/releases.atom",                group: releases }
+- { name: "google/adk-python",                url: "https://github.com/google/adk-python/releases.atom",                   group: releases }
+
+# ── Research (replacing the legacy arxiv.org/rss URLs) ───────────────────────
+- { name: "arXiv cs.AI+cs.CL (new host)",     url: "https://rss.arxiv.org/rss/cs.AI+cs.CL",                                group: research }
+- { name: "arXiv cs.LG (new host)",           url: "https://rss.arxiv.org/rss/cs.LG",                                      group: research }
+
+# ── Newsletters (Substack /feed carries full text for free posts) ────────────
+- { name: "Interconnects",                    url: "https://www.interconnects.ai/feed",                                    group: newsletter }
+- { name: "Latent Space",                     url: "https://www.latent.space/feed",                                        group: newsletter }
+- { name: "One Useful Thing",                 url: "https://www.oneusefulthing.org/feed",                                  group: newsletter }
+- { name: "AI Snake Oil",                     url: "https://www.aisnakeoil.com/feed",                                      group: newsletter }
+- { name: "Last Week in AI",                  url: "https://lastweekin.ai/feed",                                           group: newsletter }
+- { name: "TLDR AI (official)",               url: "https://tldr.tech/api/rss/ai",                                         group: newsletter }
+- { name: "The Rundown (beehiiv, community-reported)", url: "https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml",                group: newsletter }
+
+# ── The Aisle candidates ─────────────────────────────────────────────────────
+- { name: "Supermarket News Technology",      url: "https://www.supermarketnews.com/grocery-technology/technology-rss-feed", group: aisle }
+- { name: "Modern Retail",                    url: "https://www.modernretail.co/feed/",                                    group: aisle }
+- { name: "RetailWire",                       url: "https://retailwire.com/feed/",                                         group: aisle }
+- { name: "Retail TouchPoints",               url: "https://www.retailtouchpoints.com/feed",                               group: aisle }
+- { name: "Progressive Grocer",               url: "https://progressivegrocer.com/rss.xml",                                group: aisle }
+- { name: "Digital Commerce 360",             url: "https://www.digitalcommerce360.com/feed/",                             group: aisle }
+- { name: "Just Food",                        url: "https://www.just-food.com/feed/",                                      group: aisle }
+- { name: "Consumer Goods Technology",        url: "https://consumergoods.com/rss.xml",                                    group: aisle }
+- { name: "CB Insights Research",             url: "https://www.cbinsights.com/research/feed/",                            group: aisle }
+- { name: "McKinsey Insights",                url: "https://www.mckinsey.com/insights/rss",                                group: aisle }
+- { name: "Bain Insights",                    url: "https://www.bain.com/rss-feed",                                        group: aisle }
+- { name: "Target corporate news",            url: "https://corporate.target.com/feeds/news",                              group: aisle_pr }
+- { name: "About Amazon",                     url: "https://www.aboutamazon.com/rss/feed.rss",                             group: aisle_pr }
+- { name: "Instacart tech blog",              url: "https://tech.instacart.com/feed",                                      group: aisle_pr }
+- { name: "Shopify Engineering",              url: "https://shopify.engineering/blog.atom",                                group: aisle_pr }

@@ -201,6 +201,7 @@ and pauses at $145/month.
 .github/workflows/daily-episode.yml   cron + manual trigger → produce & publish
 .github/workflows/rebuild-feed.yml    regenerate feeds after editing podcast.yaml
 .github/workflows/ci.yml              ruff + pytest + keyless smoke run
+.github/workflows/probe-sources.yml   manual: feed health report for sources.yaml + docs/spikes/candidate-feeds.yaml
 pipeline/
   workflow.py       orchestration, status machine, safe mode, notifications
   cli.py            run / rebuild-feed / check-config
@@ -215,5 +216,7 @@ pipeline/
 config/             podcast, sources, voices, stitch, budget, curation, agents/*.yaml
 assets/             intro.mp3 (jingle), cover.png (placeholder artwork)
 infra/              setup-aws.sh + IAM/bucket policy templates
+scripts/            make_cover.py, probe_sources.py (feed health diagnostic)
+docs/spikes/        design spikes (data sources & ingestion, candidate feed list)
 tests/              unit tests + ffmpeg-backed audio/publish tests
 ```
