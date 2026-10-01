@@ -41,7 +41,16 @@ export default {
       return;
     }
     const payload = { dry_run: (env.DRY_RUN || "false") === "true" };
-    await dispatch(env, payload);
+    if (!env.GH_TOKEN) {
+      console.log("GitHub dispatch failed: GH_TOKEN secret is not set (npx wrangler secret put GH_TOKEN)");
+      throw new Error("GH_TOKEN secret is not set");
+    }
+    try {
+      await dispatch(env, payload);
+    } catch (e) {
+      console.log(e.message); // visible as a plain log line; rethrow so the cron run is marked failed
+      throw e;
+    }
     console.log(`dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} at ${now.toISOString()} payload=${JSON.stringify(payload)}`);
   },
 
