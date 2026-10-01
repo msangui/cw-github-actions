@@ -10,14 +10,23 @@
  * Manual requests are dry runs unless `?dry_run=false` is given, so a stray request can't publish.
  */
 
+/** The token as pasted into the dashboard, minus the newline/quotes/"Bearer " people paste along with it. */
+function cleanToken(raw) {
+  return (raw || "").replace(/^\s*(Bearer\s+)?/i, "").replace(/^["']|["']$/g, "").trim();
+}
+
 async function dispatch(env, payload) {
-  if (!env.GH_TOKEN) {
+  const token = cleanToken(env.GH_TOKEN);
+  if (!token) {
     throw new Error("GitHub dispatch failed: GH_TOKEN secret is not set (Settings → Variables and Secrets)");
+  }
+  if (!/^[A-Za-z0-9_]+$/.test(token)) {
+    throw new Error("GitHub dispatch failed: GH_TOKEN contains characters that are not valid in a token (re-paste it without spaces, quotes or line breaks)");
   }
   const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/dispatches`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.GH_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "context-window-trigger",
