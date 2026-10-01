@@ -10,7 +10,7 @@ language: "en-us"
 author: "Context Window"
 owner_name: "Context Window"
 # Spotify requires a contact email in <itunes:owner>. Use a real inbox you control.
-owner_email: "podcast@example.com"
+owner_email: "msangui@gmail.com"
 # Optional website for the show. Defaults to the feed's public base URL when empty.
 link: ""
 copyright: "Context Window"
