@@ -9,7 +9,7 @@ from pipeline.config import Settings
 from pipeline.embeddings import embed_text
 from pipeline.llm import LLM
 from pipeline.log import get_logger
-from pipeline.memory import HeadlineMemory, title_overlap
+from pipeline.memory import HeadlineMemory, title_overlap, title_words
 
 log = get_logger(stage="curator")
 
@@ -80,6 +80,40 @@ def score_story(story: dict[str, Any], now: Optional[datetime] = None) -> dict[s
     elif coverage >= 2:
         score += 1
     return {**story, "score": score}
+
+
+def cluster_coverage(stories: list[dict[str, Any]], threshold: float = 0.6) -> list[dict[str, Any]]:
+    """Cross-coverage measured on our own feeds: how many distinct sources ran a story with an
+    overlapping title. Free, and unlike a raw Google hit count it actually varies between stories.
+    Sets coverage_count = max(existing coverage_count, cluster size)."""
+    words = [title_words(s.get("title", "")) for s in stories]
+    names = [s.get("source_name", "") for s in stories]
+    out: list[dict[str, Any]] = []
+    for i, s in enumerate(stories):
+        wi = words[i]
+        sources = {names[i]}
+        if wi:
+            for j, wj in enumerate(words):
+                if j != i and wj and names[j] not in sources and len(wi & wj) / len(wi) > threshold:
+                    sources.add(names[j])
+        out.append({**s, "coverage_count": max(int(s.get("coverage_count", 0) or 0), len(sources))})
+    return out
+
+
+def cap_per_source(stories: list[dict[str, Any]], max_per_source: int) -> list[dict[str, Any]]:
+    """Keep input order (already score-sorted) but let no outlet take more than max_per_source slots.
+    Without this a single live Tier 0 feed with ten fresh posts fills most of the episode."""
+    if max_per_source <= 0:
+        return list(stories)
+    taken: dict[str, int] = {}
+    kept: list[dict[str, Any]] = []
+    for s in stories:
+        name = s.get("source_name", "")
+        if taken.get(name, 0) >= max_per_source:
+            continue
+        taken[name] = taken.get(name, 0) + 1
+        kept.append(s)
+    return kept
 
 
 def simple_dedup(stories: list[dict[str, Any]], threshold: float = 0.6) -> list[dict[str, Any]]:
@@ -182,15 +216,20 @@ def curate(settings: Settings, llm: LLM, memory: Optional[HeadlineMemory], stori
     max_stories = int(cfg.get("max_stories", 14))
     deep_dive_count = int(cfg.get("deep_dive_count", 4))
     deep_dive_min_cov = int(cfg.get("deep_dive_min_coverage", 2))
+    max_per_source = int(cfg.get("max_per_source", 3))
+    threshold = float(cfg.get("title_overlap_threshold", 0.6))
 
     log.info("Starting curation", story_count=len(stories))
-    scored = sorted((score_story(s) for s in stories), key=lambda s: s["score"], reverse=True)
+    covered = cluster_coverage(stories, threshold)
+    scored = sorted((score_story(s) for s in covered), key=lambda s: s["score"], reverse=True)
     filtered = [s for s in scored if s["score"] >= min_score]
     tier0 = [s for s in filtered if str(s.get("source_tier")) == "0"]
     others = [s for s in filtered if str(s.get("source_tier")) != "0"]
 
     deduped = dedup_stories(settings, memory, tier0 + others, cfg)
-    selected = deduped[:max_stories]
+    selected = cap_per_source(deduped, max_per_source)[:max_stories]
+    multi = sum(1 for s in selected if int(s.get("coverage_count", 0) or 0) >= 2)
+    log.info("Selection", candidates=len(deduped), selected=len(selected), multi_source=multi, sources=len({s.get("source_name") for s in selected}))
 
     deep = [s for s in selected if int(s.get("coverage_count", 0) or 0) >= deep_dive_min_cov][:deep_dive_count]
     if len(deep) < 3:  # without Serper every story has coverage 1; fall back to top scores

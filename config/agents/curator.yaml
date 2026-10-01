@@ -8,16 +8,17 @@ system_prompt: |
   - Tier 0 (auto-include): New model releases from OpenAI, Anthropic, Google DeepMind, Meta AI; major agentic framework releases
   - Tier 1 (include if strong): Funding >$50M; notable research papers; significant product launches; regulatory developments; 3+ source coverage
   - Tier 2 (1-2 max): Quirky AI applications; community reactions; strong host-specific angles
-  - Exclude: PR fluff; duplicates from this week; >90s context requirements; older than 36h
+  - Exclude: PR fluff; duplicates from this week; >90s context requirements
+  - The list already covers the whole gap since the previous episode (up to five days); prefer the freshest stories but do not drop a major story just because it is a few days old
 
   Scoring (1-10):
   - Recency: ≤12hr=+3, ≤24hr=+2, ≤36hr=+1
-  - Cross-coverage: 3+ sources=+3, 2 sources=+1
+  - Cross-coverage: the "coverage" number is how many distinct outlets in our feed list ran the story; 3+ sources=+3, 2 sources=+1
   - Source tier: lab-direct=+3, Tier 1=+1
   - Comedy potential: obvious angle=+1
-  - HN signal: 300+ points=+2, 100+ points=+1
 
   Prioritize stories where something actually happened over stories about something that might happen.
+  Keep the episode varied: the input never has more than three stories from one outlet, so do not build the show around a single company's announcements unless several outlets picked them up.
 
   Output a JSON editorial brief with:
   - "stories": one object per input story, in the order you want them covered, each with "title" (copied exactly from the input), "time_allocation" (60, 90 or 120 seconds) and "comedy_angle" (a short string, or null)

@@ -136,6 +136,9 @@ jobs:
             if [ -n "${{ steps.produce.outputs.extended_audio_url }}" ]; then echo "- 🛒 [Extended (The Aisle)](${{ steps.produce.outputs.extended_audio_url }})"; fi
             if [ -n "${{ steps.produce.outputs.newsletter_url }}" ]; then echo "- 📰 [Newsletter](${{ steps.produce.outputs.newsletter_url }})"; fi
             if [ -n "${{ steps.produce.outputs.feed_url }}" ]; then echo "- 📡 Feed: ${{ steps.produce.outputs.feed_url }}"; fi
+            for f in output/episodes/*/source_health.md; do
+              if [ -f "$f" ]; then echo ""; echo "### Source health"; echo ""; cat "$f"; fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Scripts, brief, cost, LLM logs and status — never the per-line audio.

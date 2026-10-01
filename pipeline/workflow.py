@@ -23,7 +23,7 @@ from pipeline.llm import LLM
 from pipeline.log import get_logger
 from pipeline.memory import HeadlineMemory
 from pipeline.notify import esc, telegram
-from pipeline.stages import cfo
+from pipeline.stages import cfo, ingest
 from pipeline.stages.aisle_curator import curate_aisle
 from pipeline.stages.aisle_writer import write_aisle
 from pipeline.stages.coverage import add_coverage
@@ -119,6 +119,7 @@ class EpisodeRun:
             raw_stories: list[dict] = f_main.result()
             raw_aisle: list[dict] = f_aisle.result() if f_aisle else []
         self.log.info("Ingested", main=len(raw_stories), aisle=len(raw_aisle))
+        self._report_source_health()
         if not raw_stories:
             raise RuntimeError("No stories ingested from any source")
 
@@ -226,6 +227,22 @@ class EpisodeRun:
         self.set_status("PUBLISHED")
         self._notify_published(metadata, brief, result, cost, alerts, extended is not None)
         return {"status": "PUBLISHED", "date": self.date, "has_aisle_variant": extended is not None, "cost": cost, **result}
+
+    def _report_source_health(self) -> None:
+        """Write source_health.{json,md} next to the other run artifacts and warn when a Tier 0 feed is silent."""
+        rows = ingest.health_report()
+        if not rows:
+            return  # ingest came from a checkpoint
+        window = int(self.settings.load_yaml("sources").get("window_hours", 48))
+        self._write_text("source_health.json", json.dumps(rows, indent=2))
+        self._write_text("source_health.md", ingest.health_markdown(rows, window))
+        bad = [r for r in rows if r["verdict"] != "OK"]
+        self.log.info("Source health", feeds=len(rows), unhealthy=len(bad), dead=sum(1 for r in bad if r["verdict"] == "DEAD"))
+        t0 = ingest.tier0_problems(rows)
+        if t0:
+            names = ", ".join(f"{r['source']} ({r['verdict']})" for r in t0)
+            self.log.warning("Tier 0 sources delivered nothing", sources=names)
+            telegram(self.settings, f"⚠️ <b>Context Window {esc(self.date)}</b> — Tier 0 feeds silent: {esc(names)}")
 
     # ── safe mode ──────────────────────────────────────────────────────────
     def _safe_mode(self, brief: dict, aisle_brief: dict, script_result: dict, editor_result: dict, approved_aisle_script: Optional[str]) -> dict[str, Any]:

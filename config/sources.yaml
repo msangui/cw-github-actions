@@ -1,76 +1,110 @@
-# RSS sources. Replaces tool_configs.rss_sources / aisle_sources.
+# RSS/Atom sources. Replaces tool_configs.rss_sources / aisle_sources.
 # tier "0" = lab-direct (auto-include, +3 score); "1" = original sources (+1); "2" = other.
-# Set active: false to keep a source in the list without fetching it.
+# Set active: false to keep a source in the list without fetching it. Optional per-source
+# max_entries overrides max_entries_per_feed (used to stop firehose feeds flooding the pool).
 # 120h (5 days) so a Tue/Thu cadence never misses anything: the Thu -> Tue gap is 5 days.
 # Recency scoring still favours the last 36h; older stories only survive on tier/coverage.
+#
+# Health of every feed is reported per run in output/episodes/<date>/source_health.md (and the job
+# summary). The 2026-10-01 run found 16 of 50 feeds dead and 9 more empty; this list is the repair.
+# Probe the whole list plus candidates with `python scripts/probe_sources.py` (or the Probe sources workflow).
 window_hours: 120
 max_entries_per_feed: 50
 
 main:
-  # Tier 0 — lab-direct, always included
-  - { name: "OpenAI Blog",                url: "https://openai.com/blog/rss.xml",                                      tier: "0", active: true }
-  - { name: "Anthropic News",             url: "https://www.anthropic.com/news/rss.xml",                               tier: "0", active: true }
-  - { name: "Google DeepMind",            url: "https://deepmind.google/blog/rss/",                                    tier: "0", active: true }
-  - { name: "Meta AI Blog",               url: "https://ai.meta.com/blog/rss/",                                        tier: "0", active: true }
-  # Tier 1 — original sources
-  - { name: "TechCrunch AI",              url: "https://techcrunch.com/category/artificial-intelligence/feed/",        tier: "1", active: true }
-  - { name: "VentureBeat AI",             url: "https://venturebeat.com/category/ai/feed/",                            tier: "1", active: true }
-  - { name: "Wired AI",                   url: "https://www.wired.com/feed/tag/ai/latest/rss",                         tier: "1", active: true }
-  - { name: "HuggingFace Blog",           url: "https://huggingface.co/blog/feed.xml",                                 tier: "1", active: true }
-  - { name: "Google Research Blog",       url: "https://blog.research.google/feeds/posts/default",                     tier: "1", active: true }
-  - { name: "arXiv CS.AI",                url: "https://arxiv.org/rss/cs.AI",                                          tier: "1", active: true }
-  - { name: "MIT Technology Review",      url: "https://www.technologyreview.com/feed/",                               tier: "1", active: true }
-  - { name: "The Verge AI",               url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",    tier: "1", active: true }
-  - { name: "Ars Technica",               url: "https://feeds.arstechnica.com/arstechnica/technology-lab",             tier: "1", active: true }
-  - { name: "BAIR Blog",                  url: "https://bair.berkeley.edu/blog/feed.xml",                              tier: "1", active: true }
-  - { name: "Microsoft Research",         url: "https://www.microsoft.com/en-us/research/blog/feed/",                  tier: "1", active: true }
-  - { name: "The Gradient",               url: "https://thegradient.pub/rss/",                                         tier: "1", active: true }
-  - { name: "arXiv CS.LG",                url: "https://arxiv.org/rss/cs.LG",                                          tier: "1", active: true }
-  # Tier 1 — company blogs
-  - { name: "Cohere Blog",                url: "https://cohere.com/blog/rss",                                          tier: "1", active: true }
-  - { name: "Mistral Blog",               url: "https://mistral.ai/news/rss",                                          tier: "1", active: true }
-  - { name: "Together AI Blog",           url: "https://www.together.ai/blog/rss",                                     tier: "1", active: true }
-  - { name: "Replicate Blog",             url: "https://replicate.com/blog/rss.xml",                                   tier: "1", active: true }
-  - { name: "Perplexity Blog",            url: "https://blog.perplexity.ai/rss",                                       tier: "1", active: true }
-  - { name: "xAI Blog",                   url: "https://x.ai/blog/rss",                                                tier: "1", active: true }
-  - { name: "Stability AI Blog",          url: "https://stability.ai/blog/rss",                                        tier: "1", active: true }
-  # Tier 1 — additional arXiv categories
-  - { name: "arXiv cs.CL",                url: "https://arxiv.org/rss/cs.CL",                                          tier: "1", active: true }
-  - { name: "arXiv cs.CV",                url: "https://arxiv.org/rss/cs.CV",                                          tier: "1", active: true }
-  - { name: "arXiv cs.RO",                url: "https://arxiv.org/rss/cs.RO",                                          tier: "1", active: true }
-  - { name: "arXiv cs.NE",                url: "https://arxiv.org/rss/cs.NE",                                          tier: "1", active: true }
-  - { name: "arXiv stat.ML",              url: "https://arxiv.org/rss/stat.ML",                                        tier: "1", active: true }
-  # Tier 1 — developer / practitioner outlets
-  - { name: "LangChain Blog",             url: "https://blog.langchain.dev/rss/",                                      tier: "1", active: true }
-  - { name: "LlamaIndex Blog",            url: "https://www.llamaindex.ai/blog/rss",                                   tier: "1", active: true }
-  - { name: "Weights & Biases Blog",      url: "https://wandb.ai/fully-connected/feed",                                tier: "1", active: true }
-  - { name: "fast.ai Blog",               url: "https://www.fast.ai/index.xml",                                        tier: "1", active: true }
-  - { name: "Simon Willison's Weblog",    url: "https://simonwillison.net/atom/entries/",                              tier: "1", active: true }
-  - { name: "Sebastian Raschka Newsletter", url: "https://magazine.sebastianraschka.com/feed",                         tier: "1", active: true }
-  - { name: "Chip Huyen Blog",            url: "https://huyenchip.com/feed.xml",                                       tier: "1", active: true }
-  # Tier 1 — tech media / analysis
-  - { name: "IEEE Spectrum AI",           url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss",    tier: "1", active: true }
-  - { name: "ZDNet AI",                   url: "https://www.zdnet.com/topic/artificial-intelligence/rss.xml",          tier: "1", active: true }
-  - { name: "The Register AI",            url: "https://www.theregister.com/emergent_tech/ai_ml/headlines.atom",       tier: "1", active: true }
-  - { name: "InfoQ AI",                   url: "https://feed.infoq.com/ai-ml-data-eng/",                               tier: "1", active: true }
-  - { name: "Analytics Vidhya",           url: "https://www.analyticsvidhya.com/feed/",                                tier: "1", active: true }
-  - { name: "KDnuggets",                  url: "https://www.kdnuggets.com/feed",                                       tier: "1", active: true }
-  - { name: "Towards Data Science",       url: "https://towardsdatascience.com/feed",                                  tier: "1", active: true }
-  - { name: "Data Science Weekly",        url: "https://www.datascienceweekly.org/newsletter-issues.rss",              tier: "1", active: true }
-  # Tier 1 — policy / safety / capital
-  - { name: "AI Now Institute",           url: "https://ainowinstitute.org/feed",                                      tier: "1", active: true }
-  - { name: "Import AI",                  url: "https://jack-clark.net/feed/",                                         tier: "1", active: true }
-  - { name: "The Batch",                  url: "https://www.deeplearning.ai/the-batch/feed/",                          tier: "1", active: true }
-  - { name: "MIT News AI",                url: "https://news.mit.edu/topic/artificial-intelligence2/rss",              tier: "1", active: true }
-  - { name: "Stanford HAI",               url: "https://hai.stanford.edu/news/rss.xml",                                tier: "1", active: true }
-  - { name: "a16z AI",                    url: "https://a16z.com/category/ai-machine-learning/feed/",                  tier: "1", active: true }
+  # ── Tier 0 — lab-direct, always included ─────────────────────────────────
+  - { name: "OpenAI News",              url: "https://openai.com/news/rss.xml",                                      tier: "0", active: true }
+  # Anthropic publishes no feed (anthropic.com/news/rss.xml is a 404). Community mirrors, 6-hourly, headline-only.
+  - { name: "Anthropic News",           url: "https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml",        tier: "0", active: true }
+  - { name: "Anthropic Engineering",    url: "https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_engineering_rss.xml", tier: "0", active: true }
+  - { name: "Claude Blog",              url: "https://tim-hilde.github.io/anthropic-rss/rss.xml",                    tier: "0", active: true }
+  - { name: "Google DeepMind",          url: "https://deepmind.google/blog/rss.xml",                                 tier: "0", active: true }
+  # ai.meta.com has no feed; community scraper, twice daily.
+  - { name: "Meta AI Blog",             url: "https://aabsinthium.github.io/meta-ai-blog-rss/feed.xml",              tier: "0", active: true }
+
+  # ── Tier 1 — tech media ──────────────────────────────────────────────────
+  - { name: "TechCrunch AI",            url: "https://techcrunch.com/category/artificial-intelligence/feed/",        tier: "1", active: true }
+  - { name: "VentureBeat AI",           url: "https://venturebeat.com/category/ai/feed/",                            tier: "1", active: true }   # 429 on 2026-10-01; rate limited, retry
+  - { name: "Wired AI",                 url: "https://www.wired.com/feed/tag/ai/latest/rss",                         tier: "1", active: true }
+  - { name: "The Verge AI",             url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",    tier: "1", active: true }
+  - { name: "Ars Technica",             url: "https://feeds.arstechnica.com/arstechnica/technology-lab",             tier: "1", active: true }
+  - { name: "MIT Technology Review",    url: "https://www.technologyreview.com/feed/",                               tier: "1", active: true }
+  - { name: "IEEE Spectrum AI",         url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss",    tier: "1", active: true }
+  - { name: "ZDNet AI",                 url: "https://www.zdnet.com/topic/artificial-intelligence/rss.xml",          tier: "1", active: true }
+  - { name: "The Register AI",          url: "https://www.theregister.com/software/ai_ml/headlines.atom",            tier: "1", active: true }   # old emergent_tech path 404s
+  - { name: "InfoQ AI",                 url: "https://feed.infoq.com/ai-ml-data-eng/",                               tier: "1", active: true }
+  - { name: "Techmeme",                 url: "https://www.techmeme.com/feed.xml",                                    tier: "1", active: true }   # human-curated; strong "what mattered" signal
+
+  # ── Tier 1 — community signal ────────────────────────────────────────────
+  # Hacker News front page filtered to ≥100 points: the "HN signal" the curator rubric wanted.
+  - { name: "Hacker News (100+ points)", url: "https://hnrss.org/newest?points=100&count=100",                       tier: "1", active: true }
+
+  # ── Tier 1 — labs & research blogs ──────────────────────────────────────
+  - { name: "HuggingFace Blog",         url: "https://huggingface.co/blog/feed.xml",                                 tier: "1", active: true, max_entries: 30 }
+  - { name: "Google Research Blog",     url: "https://research.google/blog/rss",                                     tier: "1", active: true }   # blog.research.google is the legacy host
+  - { name: "Microsoft Research",       url: "https://www.microsoft.com/en-us/research/feed/",                       tier: "1", active: true }
+  - { name: "BAIR Blog",                url: "https://bair.berkeley.edu/blog/feed.xml",                              tier: "1", active: true }
+  - { name: "The Gradient",             url: "https://thegradient.pub/rss/",                                         tier: "1", active: true }
+  - { name: "Mistral Blog",             url: "https://mistral.ai/news/rss",                                          tier: "1", active: true }
+  - { name: "Replicate Blog",           url: "https://replicate.com/blog/rss",                                       tier: "1", active: true }   # no .xml suffix
+  - { name: "Replicate Changelog",      url: "https://replicate.com/changelog/rss",                                  tier: "2", active: true }
+  - { name: "Stability AI Blog",        url: "https://stability.ai/blog?format=rss",                                 tier: "1", active: true }
+  # No feed of any kind, native or scraped, as of 2026-10-01. Big news from them reaches TechCrunch/The Verge anyway.
+  - { name: "Cohere Blog",              url: "https://cohere.com/blog/rss",                                          tier: "1", active: false }  # feed returns 0 entries
+  - { name: "Together AI Blog",         url: "https://www.together.ai/blog/rss",                                     tier: "1", active: false }  # 404
+  - { name: "Perplexity Blog",          url: "https://blog.perplexity.ai/rss",                                       tier: "1", active: false }  # 403
+  - { name: "xAI Blog",                 url: "https://x.ai/blog/rss",                                                tier: "1", active: false }  # 403
+
+  # ── Tier 1 — releases that matter for an agentic-engineering show ────────
+  # GitHub releases.atom carries the full release notes and needs no token.
+  - { name: "Claude Code releases",     url: "https://github.com/anthropics/claude-code/releases.atom",              tier: "1", active: true, max_entries: 5 }
+  - { name: "Anthropic Python SDK releases", url: "https://github.com/anthropics/anthropic-sdk-python/releases.atom", tier: "2", active: true, max_entries: 3 }
+  - { name: "OpenAI Agents SDK releases", url: "https://github.com/openai/openai-agents-python/releases.atom",       tier: "2", active: true, max_entries: 3 }
+  - { name: "MCP spec releases",        url: "https://github.com/modelcontextprotocol/modelcontextprotocol/releases.atom", tier: "1", active: true, max_entries: 3 }
+  - { name: "LangGraph releases",       url: "https://github.com/langchain-ai/langgraph/releases.atom",              tier: "2", active: true, max_entries: 3 }
+  - { name: "vLLM releases",            url: "https://github.com/vllm-project/vllm/releases.atom",                   tier: "1", active: true, max_entries: 3 }
+  - { name: "Pydantic AI releases",     url: "https://github.com/pydantic/pydantic-ai/releases.atom",                tier: "2", active: true, max_entries: 3 }
+
+  # ── Tier 2 — research firehose ───────────────────────────────────────────
+  # One combined arXiv feed on the current host, capped: the seven legacy arxiv.org/rss feeds put 315 of
+  # 445 stories into the pool on 2026-10-01 and nothing distinguished one paper from another.
+  - { name: "arXiv cs.AI+cs.CL+cs.LG",  url: "https://rss.arxiv.org/rss/cs.AI+cs.CL+cs.LG",                          tier: "2", active: true, max_entries: 30 }
+
+  # ── Tier 1/2 — developer & practitioner outlets ──────────────────────────
+  - { name: "LangChain Blog",           url: "https://blog.langchain.com/rss/",                                      tier: "1", active: true }   # .dev feed is empty
+  - { name: "LlamaIndex Blog",          url: "https://www.llamaindex.ai/blog/rss",                                   tier: "1", active: false }  # 404
+  - { name: "Weights & Biases Blog",    url: "https://wandb.ai/fully-connected/feed",                                tier: "1", active: false }  # empty
+  - { name: "fast.ai Blog",             url: "https://www.fast.ai/index.xml",                                        tier: "2", active: true }
+  - { name: "Simon Willison's Weblog",  url: "https://simonwillison.net/atom/entries/",                              tier: "1", active: true }
+  - { name: "Sebastian Raschka Newsletter", url: "https://magazine.sebastianraschka.com/feed",                        tier: "1", active: true }
+  - { name: "Chip Huyen Blog",          url: "https://huyenchip.com/feed.xml",                                       tier: "1", active: true }
+  - { name: "Analytics Vidhya",         url: "https://www.analyticsvidhya.com/feed/",                                tier: "2", active: true }
+  - { name: "KDnuggets",                url: "https://www.kdnuggets.com/feed",                                       tier: "2", active: true }
+  - { name: "Towards Data Science",     url: "https://towardsdatascience.com/feed",                                  tier: "2", active: true, max_entries: 10 }
+  - { name: "Data Science Weekly",      url: "https://www.datascienceweekly.org/newsletter-issues.rss",              tier: "2", active: false }  # 404
+
+  # ── Tier 1/2 — newsletters & analysis (commentary for CLAIRE, rarely discovery) ─
+  - { name: "Import AI",                url: "https://jack-clark.net/feed/",                                         tier: "1", active: true }
+  - { name: "Interconnects",            url: "https://www.interconnects.ai/feed",                                    tier: "1", active: true }
+  - { name: "Latent Space",             url: "https://www.latent.space/feed",                                        tier: "1", active: true }
+  - { name: "One Useful Thing",         url: "https://www.oneusefulthing.org/feed",                                  tier: "2", active: true }
+  - { name: "TLDR AI",                  url: "https://tldr.tech/api/rss/ai",                                         tier: "2", active: true }
+  - { name: "The Batch",                url: "https://www.deeplearning.ai/the-batch/feed/",                          tier: "1", active: false }  # 403
+  - { name: "AI Now Institute",         url: "https://ainowinstitute.org/feed",                                      tier: "1", active: true }
+  - { name: "MIT News AI",              url: "https://news.mit.edu/topic/artificial-intelligence2/rss",              tier: "1", active: false }  # 403
+  - { name: "Stanford HAI",             url: "https://hai.stanford.edu/news/rss.xml",                                tier: "1", active: false }  # empty
+  - { name: "a16z AI",                  url: "https://a16z.com/category/ai-machine-learning/feed/",                  tier: "1", active: false }  # 404
 
 # "The Aisle" — CPG / Retail AI segment inserted before "Read These" in the extended edition.
 aisle:
   enabled: true
   sources:
-    - { name: "Grocery Dive",       url: "https://www.grocerydive.com/feeds/news/",   tier: "2", active: true }
-    - { name: "Retail Dive",        url: "https://www.retaildive.com/feeds/news/",    tier: "2", active: true }
-    - { name: "Food Dive",          url: "https://www.fooddive.com/feeds/news/",      tier: "2", active: true }
-    - { name: "Supermarket News",   url: "https://www.supermarketnews.com/rss.xml",   tier: "2", active: true }
-    - { name: "Chain Store Age",    url: "https://chainstoreage.com/rss.xml",         tier: "2", active: true }
+    - { name: "Grocery Dive",         url: "https://www.grocerydive.com/feeds/news/",       tier: "2", active: true }
+    - { name: "Retail Dive",          url: "https://www.retaildive.com/feeds/news/",        tier: "2", active: true }
+    - { name: "Food Dive",            url: "https://www.fooddive.com/feeds/news/",          tier: "2", active: true }
+    - { name: "Supermarket News",     url: "https://www.supermarketnews.com/rss.xml",       tier: "2", active: true }
+    - { name: "Chain Store Age",      url: "https://chainstoreage.com/rss.xml",             tier: "2", active: false }  # 403 (bot wall)
+    - { name: "Modern Retail",        url: "https://www.modernretail.co/feed/",             tier: "2", active: true }
+    - { name: "RetailWire",           url: "https://retailwire.com/feed/",                  tier: "2", active: true }
+    - { name: "Progressive Grocer",   url: "https://progressivegrocer.com/rss.xml",         tier: "2", active: true }
+    - { name: "Digital Commerce 360", url: "https://www.digitalcommerce360.com/feed/",      tier: "2", active: true }

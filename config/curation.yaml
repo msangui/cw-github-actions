@@ -4,14 +4,19 @@ main:
   max_stories: 14
   deep_dive_count: 4
   deep_dive_min_coverage: 2
+  # No outlet may take more than this many of the max_stories slots. With a single live Tier 0 feed
+  # (OpenAI on 2026-10-01) ten posts from one blog otherwise fill the episode. 0 disables the cap.
+  max_per_source: 3
   dedup_window_days: 21
-  title_overlap_threshold: 0.6
+  title_overlap_threshold: 0.6         # also the threshold for in-run cross-coverage (cluster_coverage)
   embedding_distance_threshold: 0.08   # cosine distance; matches the pgvector "<=> < 0.08" check
 aisle:
   max_stories: 5
   dedup_window_days: 21
   title_overlap_threshold: 0.6
 coverage:
-  # Only the top N stories by recency + tier are sent to Serper (cost/time control).
+  # Cross-coverage is always computed from our own feeds (distinct sources carrying the same headline).
+  # Serper, when a key is set, adds Google's view on top: only the top N stories by recency + tier are
+  # searched (cost/time control).
   max_stories_to_search: 150
   concurrency: 8

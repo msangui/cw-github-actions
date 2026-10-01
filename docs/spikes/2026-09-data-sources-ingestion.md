@@ -48,6 +48,43 @@ title + URL + **300 chars of summary**; the editor fact-checks the script agains
 | F8 | **Aisle relevance is keyword matching** on title + blurb against five general retail-trade feeds. AI-in-retail stories are rare there, so most runs pick 2-3 marginal items. | `aisle_curator.py:17-60`. | Medium. Segment quality depends on luck. |
 | F9 | **Prompt and config disagree on the window.** The curator prompt says "Exclude: older than 36h"; `sources.yaml` deliberately keeps 120 h so a Tue/Thu cadence misses nothing. | `curator.yaml:11` vs `sources.yaml:4-6`. | Low-medium. On a Tuesday the model is told to drop most of the weekend. |
 
+### Production evidence: the 2026-10-01 run
+
+The first `repository_dispatch` run (Actions run 36867598117, dry run) logged every fetch. The episode came
+out "mostly OpenAI blog", and the log says why.
+
+| Group | Feeds | Result |
+|---|---|---|
+| Non-200 | 16 | Anthropic News 404, Google DeepMind 404, Meta AI 404, Together 404, Replicate 404, Stability 404, LlamaIndex 404, The Register 404, Data Science Weekly 404, a16z 404, Chain Store Age 403, xAI 403, Perplexity 403, The Batch 403, MIT News 403, VentureBeat 429 |
+| Alive, zero stories in the window | 9 | Cohere (0 entries), Google Research (legacy host), BAIR, The Gradient, fast.ai, W&B (0 entries), LangChain (0 entries), Chip Huyen, Stanford HAI (0 entries) |
+| Live Tier 0 | **1** | OpenAI (1,240 entries in the feed, 10 inside 120 h) |
+| arXiv | 7 feeds | **315 of 445** main stories, all scoring the same |
+| Everything else | ~20 | TechCrunch 19, TDS 18, Wired 10, Verge 10, MIT TR 10, ZDNet 10, InfoQ 10, KDnuggets 8, Analytics Vidhya 6, IEEE 4, HF 4, MS Research 3, … |
+
+No Serper key was set, so every story had `coverage_count = 1`. Scoring was therefore recency + tier only, OpenAI
+was the only outlet with the +3 tier bonus, and its ten posts outranked every tier-1 story of the same age.
+The Aisle got one story: Chain Store Age was walled and the remaining four trade feeds carried little AI.
+The editor approved the script while flagging five hallucinations, against 300-character blurbs (F4).
+
+### What changed in this branch (the spike's "PR 1")
+
+- `config/sources.yaml` rebuilt from the evidence: six live Tier 0 feeds (OpenAI canonical URL, two
+  Anthropic mirrors plus the Claude blog mirror, DeepMind `rss.xml`, Meta scraper), corrected hosts for
+  Google Research, The Register, LangChain and Replicate, eleven dead feeds set `active: false` with the
+  reason, Techmeme and Hacker News ≥100 points (via hnrss) as community signal, seven GitHub `releases.atom`
+  feeds for the agentic-engineering beat, one capped arXiv feed instead of seven, four newsletters, and four
+  new Aisle trade feeds. Per-source `max_entries` keeps firehoses in check.
+- `ingest.py` records a health row per feed; the run writes `source_health.{json,md}`, the job summary shows
+  the unhealthy ones, and a silent Tier 0 feed sends a Telegram warning (F1, F6).
+- `curator.py` computes cross-coverage from our own feeds (`cluster_coverage`: distinct outlets with an
+  overlapping headline), so coverage varies again without Serper (F2), and caps selection at
+  `max_per_source: 3` so one outlet cannot fill the episode.
+- `curator.yaml` no longer scores a signal that isn't collected and no longer tells the model to drop
+  anything older than 36 h on a five-day window (F3, F9).
+
+Still open from the recommendation: HF Daily Papers and HN points as structured signals (needs `kind`
+adapters, PR 2) and full-text enrichment (PR 3).
+
 ## 2. Candidate sources
 
 Verification legend: **✅ fetched** in this session · **🔎 search-only** (documented, not fetched from here) ·
