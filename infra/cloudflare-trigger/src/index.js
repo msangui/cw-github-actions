@@ -50,7 +50,7 @@ export default {
     const now = new Date();
     const tz = env.TIMEZONE || "America/New_York";
     return new Response(
-      JSON.stringify({ ok: true, repo: env.GITHUB_REPO, crons: ["0 10 * * 3,5", "0 11 * * 3,5"], timezone: tz, local_hour_now: localHour(now, tz), dry_run: env.DRY_RUN }, null, 2),
+      JSON.stringify({ ok: true, repo: env.GITHUB_REPO, crons: ["0 10 * * TUE,THU", "0 11 * * TUE,THU"], timezone: tz, local_hour_now: localHour(now, tz), dry_run: env.DRY_RUN }, null, 2),
       { headers: { "content-type": "application/json" } },
     );
   },

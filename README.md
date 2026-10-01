@@ -94,8 +94,9 @@ Replace `assets/cover.png` with real 1400–3000 px square artwork when you have
 
 Actions → **Daily episode** → *Run workflow*. There is no cron in the repo; the schedule lives in a
 Cloudflare Worker (`infra/cloudflare-trigger/`, Tuesday and Thursday 06:00 America/New_York) that calls
-`repository_dispatch`. Any other scheduler can do the same with a fine-grained PAT that has *Actions:
-write* on this repo; the exact `curl` is in the header of the workflow file. Tick **dry_run** the first time to see the script and cost
+`repository_dispatch`. Any other scheduler can do the same with a fine-grained PAT that has *Contents:
+Read and write* on this repo (not *Actions*, which only covers `workflow_dispatch`); the exact `curl` is in
+the header of the workflow file. Tick **dry_run** the first time to see the script and cost
 without spending on TTS; the run artifact contains `brief.json`, `script.txt`, `cost.json` and every LLM
 call. Then run it for real. The job summary links the MP3, newsletter and feed URL.
 
