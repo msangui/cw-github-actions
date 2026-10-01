@@ -36,18 +36,34 @@ by calling GitHub's `repository_dispatch` API. Free tier is plenty (2 requests a
 
 ## Test without waiting for Tuesday
 
-Set `DRY_RUN = "true"` in `wrangler.toml` first so the test run costs only the Claude calls, then:
+The worker only dispatches when the New York hour equals `LOCAL_HOUR`, and a manual trigger uses the
+current time, so every test below overrides `LOCAL_HOUR` to the current local hour and forces
+`DRY_RUN` so nothing is published. Repeated dry runs for the same date are nearly free: the
+pipeline resumes from that date's checkpoints.
+
+**End-to-end on Cloudflare (validates the cron scheduler + the token).** There is no "run now"
+button in the dashboard and no wrangler command to fire a deployed cron, so deploy a temporary
+every-5-minutes schedule, watch it fire, then restore:
 
 ```bash
-echo "GH_TOKEN=github_pat_..." > .dev.vars   # wrangler dev reads secrets from this git-ignored file
-npx wrangler dev --test-scheduled
-# in another terminal — pick the cron that is 06:00 local right now (10 in summer, 11 in winter):
-curl "http://localhost:8787/__scheduled?cron=0+10+*+*+TUE,THU"
+HOUR=$(TZ=America/New_York date +%-H)
+npx wrangler deploy --triggers "*/5 * * * *" --var LOCAL_HOUR:$HOUR --var DRY_RUN:true
+npx wrangler tail            # within 5 min: "dispatched produce-episode to msangui/cw-github-actions"
+npx wrangler deploy          # restore the real schedule and vars from wrangler.toml
 ```
 
-A run should appear in the repo's Actions tab within seconds with trigger `repository_dispatch`.
-Or test the deployed worker: `npx wrangler tail` in one terminal, then trigger from the
-dashboard's *Triggers → Cron Triggers → Run now* (button availability varies by plan).
+A run with trigger `repository_dispatch` appears in the repo's Actions tab. The dashboard's *Logs*
+tab shows the same lines, and *Settings → Triggers* must read `TUE,THU` again after the last deploy.
+
+**Local (validates the code and the token, not the scheduler):**
+
+```bash
+printf 'GH_TOKEN=github_pat_...\nLOCAL_HOUR=%s\nDRY_RUN=true\n' "$(TZ=America/New_York date +%-H)" > .dev.vars
+npx wrangler dev --test-scheduled
+curl "http://localhost:8787/__scheduled?cron=0+10+*+*+TUE,THU"   # second terminal
+```
+
+`.dev.vars` is git-ignored; values in it override `[vars]` for `wrangler dev` only.
 
 ## Changing the schedule
 
