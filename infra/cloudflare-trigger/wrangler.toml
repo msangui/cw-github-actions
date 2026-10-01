@@ -5,10 +5,10 @@ compatibility_date = "2026-09-01"
 # Cloudflare crons are UTC and ignore DST. 06:00 America/New_York is 10:00 UTC in
 # summer (EDT) and 11:00 UTC in winter (EST). We schedule both and the worker only
 # fires when the local hour is actually 6, so exactly one dispatch happens per day.
-# NOTE: Cloudflare numbers weekdays 1-7 starting at SUNDAY (1=Sun ... 7=Sat), unlike
-# standard cron where 0=Sun. So Tuesday/Thursday is "3,5" here, not "2,4".
+# Weekdays are written as names: Cloudflare numbers them 1-7 starting at SUNDAY (1=Sun ... 7=Sat),
+# unlike standard cron where 0=Sun, so "2,4" silently meant Mon/Wed. Names are unambiguous.
 [triggers]
-crons = ["0 10 * * 3,5", "0 11 * * 3,5"]
+crons = ["0 10 * * TUE,THU", "0 11 * * TUE,THU"]
 
 [vars]
 GITHUB_REPO = "msangui/cw-github-actions"
@@ -18,5 +18,5 @@ LOCAL_HOUR = "6"
 # Set to "true" to trigger text-only runs (no TTS / publish) while testing.
 DRY_RUN = "false"
 
-# Secret (not in this file): GH_TOKEN — fine-grained PAT with "Actions: Read and write"
-# on the repo. Set it with:  npx wrangler secret put GH_TOKEN
+# Secret (not in this file): GH_TOKEN — fine-grained PAT with "Contents: Read and write" on the
+# repo (repository_dispatch needs Contents, not Actions). Set it with:  npx wrangler secret put GH_TOKEN
