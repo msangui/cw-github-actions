@@ -2,23 +2,21 @@ name = "context-window-trigger"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
-# Cloudflare crons are UTC and ignore DST. 06:00 America/New_York is 10:00 UTC in
-# summer (EDT) and 11:00 UTC in winter (EST). We schedule both and the worker only
-# fires when the local hour is actually 6, so exactly one dispatch happens per day.
-# Weekdays are written as names: Cloudflare numbers them 1-7 starting at SUNDAY (1=Sun ... 7=Sat),
-# unlike standard cron where 0=Sun, so "2,4" silently meant Mon/Wed. Names are unambiguous.
+# Tuesday and Thursday at 10:00 UTC = 06:00 New York in summer (EDT), 05:00 in winter (EST).
+# Cloudflare crons are UTC with no DST support; one fixed hour keeps the worker trivial. Change the
+# hour here if the winter time matters. Weekdays are written as names because Cloudflare numbers them
+# 1-7 from Sunday, unlike standard cron. Every firing dispatches — there is no time-of-day check.
 [triggers]
-crons = ["0 10 * * TUE,THU", "0 11 * * TUE,THU"]
+crons = ["0 10 * * TUE,THU"]
 
 [vars]
 GITHUB_REPO = "msangui/cw-github-actions"
 EVENT_TYPE = "produce-episode"
-TIMEZONE = "America/New_York"
-LOCAL_HOUR = "6"
-# Set to "true" to trigger text-only runs (no TTS / publish) while testing.
+# "true" makes scheduled runs text-only (no TTS / publish). Manual triggers are always dry unless asked.
 DRY_RUN = "false"
 
-# Secrets (not in this file), set with `npx wrangler secret put <NAME>`:
-#   GH_TOKEN        fine-grained PAT with "Contents: Read and write" on the repo
+# Secrets (not in this file). Set in the dashboard (Settings → Variables and Secrets, type Secret)
+# or with `npx wrangler secret put <NAME>`:
+#   GH_TOKEN        fine-grained GitHub PAT, this repo only, permission "Contents: Read and write"
 #                   (repository_dispatch needs Contents, not Actions)
-#   TRIGGER_SECRET  any long random string; enables `POST /trigger` for manual runs (see README)
+#   TRIGGER_SECRET  any long random string; enables the manual trigger URL (see README)
