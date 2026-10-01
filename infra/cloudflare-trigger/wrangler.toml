@@ -18,5 +18,7 @@ LOCAL_HOUR = "6"
 # Set to "true" to trigger text-only runs (no TTS / publish) while testing.
 DRY_RUN = "false"
 
-# Secret (not in this file): GH_TOKEN — fine-grained PAT with "Contents: Read and write" on the
-# repo (repository_dispatch needs Contents, not Actions). Set it with:  npx wrangler secret put GH_TOKEN
+# Secrets (not in this file), set with `npx wrangler secret put <NAME>`:
+#   GH_TOKEN        fine-grained PAT with "Contents: Read and write" on the repo
+#                   (repository_dispatch needs Contents, not Actions)
+#   TRIGGER_SECRET  any long random string; enables `POST /trigger` for manual runs (see README)

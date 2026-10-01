@@ -45,13 +45,44 @@ export default {
     console.log(`dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} at ${now.toISOString()} payload=${JSON.stringify(payload)}`);
   },
 
-  // Health check only. Manual runs: `gh workflow run daily-episode.yml` or the Actions tab.
+  // GET /         health check
+  // POST /trigger  manual dispatch (same code path as the cron, minus the hour gate). Requires the
+  //                TRIGGER_SECRET secret: `Authorization: Bearer <secret>`. `?dry_run=false` for a real
+  //                episode; anything else is a dry run so a stray request can't publish.
   async fetch(request, env) {
+    const url = new URL(request.url);
     const now = new Date();
     const tz = env.TIMEZONE || "America/New_York";
-    return new Response(
-      JSON.stringify({ ok: true, repo: env.GITHUB_REPO, crons: ["0 10 * * TUE,THU", "0 11 * * TUE,THU"], timezone: tz, local_hour_now: localHour(now, tz), dry_run: env.DRY_RUN }, null, 2),
-      { headers: { "content-type": "application/json" } },
-    );
+
+    if (request.method === "POST" && url.pathname === "/trigger") {
+      const secret = env.TRIGGER_SECRET;
+      const auth = request.headers.get("Authorization") || "";
+      if (!secret) return json({ ok: false, error: "TRIGGER_SECRET is not set; run `npx wrangler secret put TRIGGER_SECRET`" }, 503);
+      if (auth !== `Bearer ${secret}`) return json({ ok: false, error: "unauthorized" }, 401);
+      const payload = { dry_run: url.searchParams.get("dry_run") !== "false" };
+      try {
+        await dispatch(env, payload);
+      } catch (e) {
+        console.log(`manual trigger failed: ${e.message}`);
+        return json({ ok: false, error: e.message }, 502);
+      }
+      console.log(`manual trigger: dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} payload=${JSON.stringify(payload)}`);
+      return json({ ok: true, dispatched: env.EVENT_TYPE, repo: env.GITHUB_REPO, payload, actions: `https://github.com/${env.GITHUB_REPO}/actions` });
+    }
+
+    return json({
+      ok: true,
+      repo: env.GITHUB_REPO,
+      crons: ["0 10 * * TUE,THU", "0 11 * * TUE,THU"],
+      timezone: tz,
+      local_hour_now: localHour(now, tz),
+      local_hour_wanted: parseInt(env.LOCAL_HOUR || "6", 10),
+      dry_run: env.DRY_RUN,
+      manual_trigger: env.TRIGGER_SECRET ? "POST /trigger with Authorization: Bearer <TRIGGER_SECRET>" : "disabled (no TRIGGER_SECRET)",
+    });
   },
 };
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body, null, 2), { status, headers: { "content-type": "application/json" } });
+}

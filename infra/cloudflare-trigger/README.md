@@ -34,7 +34,30 @@ by calling GitHub's `repository_dispatch` API. Free tier is plenty (2 requests a
    In the Cloudflare dashboard → Workers → context-window-trigger → *Settings → Triggers*
    you should see both cron expressions.
 
-## Test without waiting for Tuesday
+## Manual trigger (the "run now" button)
+
+The dashboard cannot fire a cron on demand, so the worker exposes one. Set a secret once and deploy:
+
+```bash
+openssl rand -hex 24 | npx wrangler secret put TRIGGER_SECRET
+npx wrangler deploy
+```
+
+Then, with the `*.workers.dev` URL the deploy printed:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TRIGGER_SECRET" \
+  "https://context-window-trigger.<your-subdomain>.workers.dev/trigger"                 # dry run
+curl -X POST -H "Authorization: Bearer $TRIGGER_SECRET" \
+  "https://context-window-trigger.<your-subdomain>.workers.dev/trigger?dry_run=false"   # real episode
+```
+
+The response is JSON (`ok: true` plus the payload, or the GitHub error text), and a run with trigger
+`repository_dispatch` appears in the Actions tab within seconds. This uses the same `dispatch()` as
+the cron, so it proves the deployed worker and the token; it does not prove Cloudflare's scheduler
+fires — for that, see the next section or simply wait for Tuesday and check the dashboard's *Logs*.
+
+## Test the scheduler without waiting for Tuesday
 
 The worker only dispatches when the New York hour equals `LOCAL_HOUR`, and a manual trigger uses the
 current time, so every test below overrides `LOCAL_HOUR` to the current local hour and forces
