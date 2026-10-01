@@ -1,21 +1,32 @@
 /**
  * Cloudflare Worker: fires the Context Window GitHub Actions workflow via repository_dispatch.
  *
- * Schedule lives in wrangler.toml. Both 10:00 and 11:00 UTC are scheduled; only the one
- * that is 06:00 in TIMEZONE actually dispatches, so DST is handled without code changes.
+ * The schedule lives in wrangler.toml. Every cron firing dispatches; there is no time-of-day logic.
+ *
+ * HTTP surface (all JSON):
+ *   GET  /                 health check (also tells you whether the GH_TOKEN secret is set)
+ *   GET  /__scheduled      dispatch now — same code as the cron. Requires ?secret=<TRIGGER_SECRET>.
+ *   POST /trigger          dispatch now. Requires `Authorization: Bearer <TRIGGER_SECRET>`.
+ * Manual requests are dry runs unless `?dry_run=false` is given, so a stray request can't publish.
  */
 
-function localHour(date, timeZone) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hour12: false }).formatToParts(date);
-  return parseInt(parts.find((p) => p.type === "hour").value, 10) % 24;
+/** The token as pasted into the dashboard, minus the newline/quotes/"Bearer " people paste along with it. */
+function cleanToken(raw) {
+  return (raw || "").replace(/^\s*(Bearer\s+)?/i, "").replace(/^["']|["']$/g, "").trim();
 }
 
 async function dispatch(env, payload) {
-  const url = `https://api.github.com/repos/${env.GITHUB_REPO}/dispatches`;
-  const res = await fetch(url, {
+  const token = cleanToken(env.GH_TOKEN);
+  if (!token) {
+    throw new Error("GitHub dispatch failed: GH_TOKEN secret is not set (Settings → Variables and Secrets)");
+  }
+  if (!/^[A-Za-z0-9_]+$/.test(token)) {
+    throw new Error("GitHub dispatch failed: GH_TOKEN contains characters that are not valid in a token (re-paste it without spaces, quotes or line breaks)");
+  }
+  const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/dispatches`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.GH_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "context-window-trigger",
@@ -23,35 +34,58 @@ async function dispatch(env, payload) {
     },
     body: JSON.stringify({ event_type: env.EVENT_TYPE || "produce-episode", client_payload: payload }),
   });
-  // GitHub returns 204 No Content on success
   if (res.status !== 204) {
-    const text = await res.text();
-    throw new Error(`GitHub dispatch failed: HTTP ${res.status} ${text.slice(0, 300)}`);
+    // GitHub returns 204 No Content on success
+    throw new Error(`GitHub dispatch failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
   }
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body, null, 2), { status, headers: { "content-type": "application/json" } });
 }
 
 export default {
   async scheduled(event, env, ctx) {
-    const now = new Date(event.scheduledTime);
-    const tz = env.TIMEZONE || "America/New_York";
-    const want = parseInt(env.LOCAL_HOUR || "6", 10);
-    const hour = localHour(now, tz);
-    if (hour !== want) {
-      console.log(`skip: ${now.toISOString()} is ${hour}:00 in ${tz}, want ${want}:00`);
-      return;
-    }
     const payload = { dry_run: (env.DRY_RUN || "false") === "true" };
-    await dispatch(env, payload);
-    console.log(`dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} at ${now.toISOString()} payload=${JSON.stringify(payload)}`);
+    try {
+      await dispatch(env, payload);
+    } catch (e) {
+      console.log(e.message);
+      throw e; // marks the cron run as failed in the dashboard
+    }
+    console.log(`dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} payload=${JSON.stringify(payload)} cron=${event.cron}`);
   },
 
-  // Health check only. Manual runs: `gh workflow run daily-episode.yml` or the Actions tab.
   async fetch(request, env) {
-    const now = new Date();
-    const tz = env.TIMEZONE || "America/New_York";
-    return new Response(
-      JSON.stringify({ ok: true, repo: env.GITHUB_REPO, crons: ["0 10 * * TUE,THU", "0 11 * * TUE,THU"], timezone: tz, local_hour_now: localHour(now, tz), dry_run: env.DRY_RUN }, null, 2),
-      { headers: { "content-type": "application/json" } },
-    );
+    const url = new URL(request.url);
+    const manual = (request.method === "GET" && url.pathname === "/__scheduled") || (request.method === "POST" && url.pathname === "/trigger");
+
+    if (!manual) {
+      return json({
+        ok: true,
+        repo: env.GITHUB_REPO,
+        event_type: env.EVENT_TYPE,
+        dry_run: env.DRY_RUN,
+        gh_token_set: Boolean(env.GH_TOKEN),
+        manual_trigger: env.TRIGGER_SECRET ? "GET /__scheduled?secret=<TRIGGER_SECRET>" : "disabled: set the TRIGGER_SECRET secret",
+      });
+    }
+
+    const secret = env.TRIGGER_SECRET;
+    const auth = request.headers.get("Authorization") || "";
+    const ok = Boolean(secret) && (auth === `Bearer ${secret}` || url.searchParams.get("secret") === secret);
+    if (!ok) {
+      const error = secret ? "unauthorized: add ?secret=<TRIGGER_SECRET>" : "TRIGGER_SECRET is not set (Settings → Variables and Secrets, type Secret)";
+      return json({ ok: false, dispatched: false, error }, 401);
+    }
+    const payload = { dry_run: url.searchParams.get("dry_run") !== "false" };
+    try {
+      await dispatch(env, payload);
+    } catch (e) {
+      console.log(`manual: ${e.message}`);
+      return json({ ok: false, dispatched: false, payload, error: e.message }, 502);
+    }
+    console.log(`manual: dispatched ${env.EVENT_TYPE} to ${env.GITHUB_REPO} payload=${JSON.stringify(payload)}`);
+    return json({ ok: true, dispatched: true, payload, actions: `https://github.com/${env.GITHUB_REPO}/actions/workflows/daily-episode.yml` });
   },
 };
