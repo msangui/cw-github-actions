@@ -36,26 +36,36 @@ by calling GitHub's `repository_dispatch` API. Free tier is plenty (2 requests a
 
 ## Manual trigger (the "run now" button)
 
-The dashboard cannot fire a cron on demand, so the worker exposes one. Set a secret once and deploy:
+The dashboard cannot fire a deployed cron on demand (its *Schedule* test only works in the editor
+preview; against the live URL `/__scheduled` is an ordinary GET), so the worker provides the button.
 
-```bash
-openssl rand -hex 24 | npx wrangler secret put TRIGGER_SECRET
-npx wrangler deploy
-```
+1. Create the secret once — in the dashboard: *Settings → Variables and Secrets → Add*, type
+   **Secret**, name `TRIGGER_SECRET`, any long random value, *Deploy*. Or from a shell:
+   `openssl rand -hex 24 | tee /tmp/trigger_secret | npx wrangler secret put TRIGGER_SECRET`.
+2. Deploy this code once: `npx wrangler deploy`.
+3. Open in a browser (the URL is printed by the deploy; `<SECRET>` is the value from step 1):
 
-Then, with the `*.workers.dev` URL the deploy printed:
+   ```
+   https://context-window-trigger.<subdomain>.workers.dev/__scheduled?force=1&secret=<SECRET>
+   ```
 
-```bash
-curl -X POST -H "Authorization: Bearer $TRIGGER_SECRET" \
-  "https://context-window-trigger.<your-subdomain>.workers.dev/trigger"                 # dry run
-curl -X POST -H "Authorization: Bearer $TRIGGER_SECRET" \
-  "https://context-window-trigger.<your-subdomain>.workers.dev/trigger?dry_run=false"   # real episode
-```
+   The page is JSON: `"outcome": "dispatched"` and a `repository_dispatch` run appears in the Actions
+   tab within seconds; `"outcome": "error"` carries GitHub's message (a 401/403 means `GH_TOKEN` is
+   missing or lacks *Contents: write*). Add `&dry_run=false` for a real episode; without it every
+   manual run is a dry run. Drop `force=1` to see what the cron would do right now (`skip` outside
+   06:00) without dispatching.
 
-The response is JSON (`ok: true` plus the payload, or the GitHub error text), and a run with trigger
-`repository_dispatch` appears in the Actions tab within seconds. This uses the same `dispatch()` as
-the cron, so it proves the deployed worker and the token; it does not prove Cloudflare's scheduler
-fires — for that, see the next section or simply wait for Tuesday and check the dashboard's *Logs*.
+   From a shell, `POST /trigger` with a header does the same and never needs the secret in a URL:
+
+   ```bash
+   curl -X POST -H "Authorization: Bearer $TRIGGER_SECRET" \
+     "https://context-window-trigger.<subdomain>.workers.dev/trigger"   # add ?dry_run=false for real
+   ```
+
+Unauthorized requests only report the decision, never dispatch. Rotate `TRIGGER_SECRET` if a URL
+containing it leaks (browser history, screenshots). This proves the deployed worker and the GitHub
+token; it does not prove Cloudflare's scheduler fires on Tuesday — for that, check the dashboard's
+*Logs* after 06:00 America/New_York or use the next section.
 
 ## Test the scheduler without waiting for Tuesday
 
