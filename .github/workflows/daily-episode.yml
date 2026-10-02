@@ -111,6 +111,9 @@ jobs:
           PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           CW_IGNORE_BUDGET: ${{ vars.CW_IGNORE_BUDGET || '0' }}
+          # Live logs for the admin panel (admin/). Optional: unset = no reporting, never fails the run.
+          PANEL_URL: ${{ vars.PANEL_URL }}
+          PANEL_TOKEN: ${{ secrets.PANEL_TOKEN }}
           # workflow_dispatch inputs, or repository_dispatch client_payload, whichever fired
           IN_DATE: ${{ inputs.episode_date || github.event.client_payload.episode_date || '' }}
           IN_DRY_RUN: ${{ inputs.dry_run || github.event.client_payload.dry_run || 'false' }}
