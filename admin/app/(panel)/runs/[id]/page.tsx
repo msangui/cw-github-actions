@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "@/components/ConfigProvider";
 import { fmtDuration, fmtTime, statusBadge } from "@/components/runs";
+import { healthRowsFromEvents, SourceHealthTable } from "@/components/source-health";
 import { formatLogLine } from "@/lib/agent-prompt";
 import type { RunEvent, RunRecord } from "@/lib/types";
 
@@ -18,7 +19,7 @@ export default function RunPage() {
   const [script, setScript] = useState<string | null>(null);
   const [live, setLive] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"logs" | "script" | "cost">("logs");
+  const [tab, setTab] = useState<"logs" | "script" | "cost" | "sources">("logs");
   const [level, setLevel] = useState<"all" | "info" | "warning">("all");
   const [filter, setFilter] = useState("");
   const [follow, setFollow] = useState(true);
@@ -80,6 +81,8 @@ export default function RunPage() {
   const reached = run?.status_history.map((s) => s.status) ?? [];
   const current = run?.status ?? "UNKNOWN";
   const llmCalls = events.filter((e) => e.type === "log" && e.event === "LLM call complete");
+  const healthRows = useMemo(() => healthRowsFromEvents(events), [events]);
+  const health = run?.source_health;
 
   return (
     <div className="space-y-3">
@@ -124,9 +127,16 @@ export default function RunPage() {
       </div>
 
       <div className="flex items-center gap-2 border-b border-border">
-        {(["logs", "script", "cost"] as const).map((t) => (
+        {(["logs", "script", "cost", "sources"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-[13px] border-b-2 -mb-px ${tab === t ? "border-accent font-semibold" : "border-transparent text-muted"}`}>
-            {t === "logs" ? `Logs (${logs.length})` : t === "script" ? `Script${run?.word_count ? ` · ${run.word_count} words` : ""}` : `Cost${run?.cost ? ` · $${run.cost.total_usd.toFixed(2)}` : ""}`}
+            {t === "logs"
+              ? `Logs (${logs.length})`
+              : t === "script"
+                ? `Script${run?.word_count ? ` · ${run.word_count} words` : ""}`
+                : t === "cost"
+                  ? `Cost${run?.cost ? ` · $${run.cost.total_usd.toFixed(2)}` : ""}`
+                  : `Sources${health ? ` · ${health.ok}/${health.total} ok` : ""}`}
+            {t === "sources" && health && health.unhealthy.some((r) => r.tier === "0") && <span className="badge badge-err ml-1.5">tier 0</span>}
           </button>
         ))}
         {tab === "logs" && (
@@ -172,6 +182,24 @@ export default function RunPage() {
             </div>
           ) : (
             <div className="text-muted">No script reported yet{live ? " — it arrives after the editor approves." : "."}</div>
+          )}
+        </div>
+      )}
+      {tab === "sources" && (
+        <div className="card p-4 h-[60vh] overflow-auto">
+          {healthRows ? (
+            <SourceHealthTable rows={healthRows} windowHours={health?.window_hours} />
+          ) : health ? (
+            <SourceHealthTable rows={health.unhealthy} windowHours={health.window_hours} />
+          ) : (
+            <div className="text-muted">
+              {live ? "Feed health arrives right after ingest." : "This run did not report feed health — ingest resumed from a checkpoint, or the run predates the report."}
+              {" "}
+              <Link href="/sources" className="hover:underline">
+                Open Sources
+              </Link>{" "}
+              to edit feeds.
+            </div>
           )}
         </div>
       )}

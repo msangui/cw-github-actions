@@ -10,7 +10,7 @@
 import { Redis } from "@upstash/redis";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { TERMINAL_STATUSES, type EventsPayload, type RunEvent, type RunRecord } from "./types";
+import { TERMINAL_STATUSES, type EventsPayload, type RunEvent, type RunRecord, type SourceHealthRow } from "./types";
 
 const MAX_EVENTS_PER_RUN = 8000;
 const MAX_RUNS_LISTED = 50;
@@ -64,6 +64,17 @@ export function foldEvents(run: RunRecord, events: RunEvent[]): { run: RunRecord
         if (rest.cost && typeof rest.cost === "object") r.cost = rest.cost as RunRecord["cost"];
         if (typeof rest.title === "string" && rest.title) r.title = rest.title;
         r.finished_at = ev.ts;
+        break;
+      }
+      case "source_health": {
+        // Keep the record small: counts plus the feeds that need attention. Full rows stay in the events.
+        const rows = Array.isArray(ev.rows) ? (ev.rows as SourceHealthRow[]) : [];
+        r.source_health = {
+          window_hours: typeof ev.window_hours === "number" ? ev.window_hours : 0,
+          total: rows.length,
+          ok: rows.filter((x) => x.verdict === "OK").length,
+          unhealthy: rows.filter((x) => x.verdict !== "OK"),
+        };
         break;
       }
       case "log":

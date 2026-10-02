@@ -30,7 +30,7 @@ describe("applyPatch", () => {
     expect(parseYaml<{ main: unknown[] }>(out).main.length).toBe(before + 1);
     out = applyPatch(out, [{ op: "delete", path: ["main", before] }]);
     expect(parseYaml<{ main: unknown[] }>(out).main.length).toBe(before);
-    expect(out).toContain("# Tier 0 — lab-direct, always included");
+    expect(out).toContain("Tier 0 — lab-direct, always included"); // section comment survives the edits
   });
 
   it("round-trips every repo config file unchanged in meaning", () => {

@@ -73,3 +73,26 @@ def test_health_report_and_verdicts():
     md = ingest.health_markdown(list(rows.values()), 120)
     assert "DEAD: 2" in md and "| Dead |" in md and "| Fresh |" not in md  # healthy feeds omitted
     assert ingest.health_markdown([], 120).startswith("_Ingest came from a checkpoint")
+
+
+def test_workflow_reports_source_health_to_files_and_panel(settings, monkeypatch):
+    """_report_source_health writes the artifacts and emits one `source_health` event with every row."""
+    from pipeline import workflow
+    from pipeline.log import PanelReporter
+
+    calls: list[dict] = []
+    reporter = PanelReporter("https://panel.example", "tok", "run1", transport=lambda u, h, b: calls.append(b) or 202, start_thread=False)
+    monkeypatch.setattr(workflow, "panel", reporter)  # workflow binds the reporter by name at import
+    ingest.fetch_stories(SOURCES, window_hours=120, group="main", transport=_transport())
+    run = workflow.EpisodeRun(settings, "2026-10-02")
+    run._report_source_health()
+    reporter.flush()
+
+    out = settings.output_dir / "2026-10-02"
+    assert (out / "source_health.json").exists() and "DEAD" in (out / "source_health.md").read_text()
+    events = [e for b in calls for e in b["events"] if e["type"] == "source_health"]
+    assert len(events) == 1
+    ev = events[0]
+    assert ev["window_hours"] == 120
+    assert {r["source"]: r["verdict"] for r in ev["rows"]}["Dead"] == "DEAD"
+    assert all({"group", "source", "tier", "url", "status", "entries", "kept", "error", "verdict"} <= set(r) for r in ev["rows"])

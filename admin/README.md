@@ -24,11 +24,11 @@ Browser ──Clerk──▶ admin (Vercel) ──fine-grained PAT──▶ GitH
 | Hosts & dials | `config/show.yaml` hosts | bio, traits, quirks, catchphrases, voice notes, seven 0–100 manner dials, plus the five band sentences per dial |
 | Dynamics | `config/show.yaml` dynamics | eight show-level dials (joke density, banter, disagreement, interruptions, tangents, callbacks, audience address, pace) + band sentences |
 | Agents | `config/agents/*.yaml` | model, effort, max_tokens, system prompt per agent; writer word-count bounds |
-| Sources | `config/sources.yaml`, `config/curation.yaml` | feeds (tier / active), ingest window, curation counts |
+| Sources | `config/sources.yaml`, `config/curation.yaml` | feeds (tier / active / per-feed entry cap), ingest window, curation counts incl. the per-outlet cap; each feed shows its health from the latest run (dead, walled, empty, stale) |
 | Voices & mix | `config/voices.yaml`, `config/stitch.yaml` | ElevenLabs voice settings, duck curve, loudness |
 | Budget | `config/budget.yaml` | CFO thresholds and the pricing table cost.json is computed from |
 | Podcast | `config/podcast.yaml` | feed metadata (needs a feed rebuild to apply to past episodes) |
-| Runs | — | trigger `workflow_dispatch` (dry run by default), list runs, live log/script/cost view |
+| Runs | — | trigger `workflow_dispatch` (dry run by default), list runs, live log/script/cost view, per-run feed health table |
 
 The **compiled writer prompt** preview (right column on Hosts, Dynamics and Agents) is exactly the system
 prompt the writer will receive, recomputed from your pending edits on every change. It is produced by
@@ -110,7 +110,10 @@ Content-Type: application/json
     {"seq": 2, "ts": "…", "type": "status", "status": "WRITING"},
     {"seq": 3, "ts": "…", "type": "script", "script": "FLINT: …", "title": "…", "word_count": 3412, "hallucinations": [], "changes": 4},
     {"seq": 4, "ts": "…", "type": "cost", "cost": {"llm_usd": 1.62, "llm_by_agent": {"writer": 1.1}, "tts_usd": 6.9, "tts_chars": 21000, "serper_usd": 0.15, "total_usd": 8.67}},
-    {"seq": 5, "ts": "…", "type": "result", "status": "PUBLISHED", "audio_url": "…", "cost": {…}}
+    {"seq": 5, "ts": "…", "type": "source_health", "window_hours": 120,
+     "rows": [{"group": "main", "source": "OpenAI News", "tier": "0", "url": "…", "status": 200, "entries": 1240, "kept": 10, "error": "", "verdict": "OK"},
+              {"group": "main", "source": "Meta AI Blog", "tier": "0", "url": "…", "status": 404, "entries": 0, "kept": 0, "error": "", "verdict": "DEAD"}]},
+    {"seq": 6, "ts": "…", "type": "result", "status": "PUBLISHED", "audio_url": "…", "cost": {…}}
   ]
 }
 → 202 {"ok": true, "received": 5, "event_count": 812, "status": "PUBLISHED"}
@@ -119,6 +122,10 @@ Content-Type: application/json
 - `seq` is monotonic per run; the UI dedups on it, so a retried batch is harmless.
 - `type: "log"` events are the JSON log lines verbatim (`ts`, `level`, `event`, plus bound context such as
   `stage`, `component`, `date`, and call-specific fields).
+- `type: "source_health"` is sent once per run right after ingest (not when ingest resumed from a
+  checkpoint). Verdicts: `OK`, `DEAD` (404 / connection error), `HTTP <code>` (403, 429, …), `EMPTY`
+  (parsed but no entries), `STALE` (entries, none inside the window). The store keeps counts plus the
+  unhealthy rows on the run record; the full rows stay in the event.
 - Guarantees on the pipeline side: batches of 50 or every 2 s; one retry per batch; the queue is capped at
   5 000 events; after 5 consecutive failures the reporter disables itself with one warning. Nothing in the
   reporter can raise into the pipeline; `tests/test_panel_reporter.py` pins this down.

@@ -247,6 +247,7 @@ class EpisodeRun:
         self._write_text("source_health.md", ingest.health_markdown(rows, window))
         bad = [r for r in rows if r["verdict"] != "OK"]
         self.log.info("Source health", feeds=len(rows), unhealthy=len(bad), dead=sum(1 for r in bad if r["verdict"] == "DEAD"))
+        panel.event("source_health", window_hours=window, rows=rows)
         t0 = ingest.tier0_problems(rows)
         if t0:
             names = ", ".join(f"{r['source']} ({r['verdict']})" for r in t0)

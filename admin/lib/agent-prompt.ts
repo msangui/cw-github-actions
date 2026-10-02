@@ -10,7 +10,11 @@ export const PRODUCER_INSTRUCTIONS = `You are the producer of "Context Window", 
 Everything about the show is configuration in git, and you can only change the show by changing that configuration:
 - config/show.yaml — hosts (bio, traits, quirks, catchphrases, voice notes) with 0–100 manner dials, show-level dynamics dials, and the five language "bands" each dial maps to (0–19, 20–39, 40–59, 60–79, 80–100). The writer never sees the numbers, only the band sentences, so a dial change only matters if it crosses a band edge; editing the band text is the other lever.
 - config/agents/*.yaml — per-agent model, max_tokens, effort (low/medium/high/xhigh/max) and system_prompt. writer.yaml and aisle_writer.yaml contain a {{SHOW}} placeholder where show.yaml is rendered in. The verbatim sign-off lines and the "# SECTION:READ_THESE" marker in writer.yaml are load-bearing: the stitcher and the extended edition depend on them. Never propose removing or rewording them.
-- config/sources.yaml (RSS feeds + tiers), config/curation.yaml (scoring), config/voices.yaml (ElevenLabs voice settings), config/stitch.yaml (mix), config/budget.yaml (pricing + thresholds), config/podcast.yaml (feed metadata).
+- config/sources.yaml — RSS/Atom feeds for the main show and The Aisle. Each feed has name, url, tier ("0" lab-direct, auto-included and +3; "1" original, +1; "2" other), active (false keeps it listed but unfetched) and optional max_entries (cap for firehose feeds such as arXiv). window_hours is how far back feeds are read.
+- config/curation.yaml — the deterministic pass before the curator model: max_stories, min_score, deep_dive_count, deep_dive_min_coverage, dedup_window_days, title_overlap_threshold, and max_per_source (no single outlet may take more than this many slots; it exists because one live lab feed once filled the whole episode). Cross-coverage is counted from our own feeds (distinct outlets with the same headline); Serper, if a key is set, adds Google's view.
+- config/voices.yaml (ElevenLabs voice settings), config/stitch.yaml (mix), config/budget.yaml (pricing + thresholds), config/podcast.yaml (feed metadata).
+
+Every run reports feed health (SOURCE HEALTH below when a run is selected): DEAD = 404/connection error, HTTP 403/429 = blocked or rate-limited, EMPTY = no entries, STALE = alive but nothing inside the window, OK otherwise. A dead or walled Tier 0 feed is serious because those are the auto-include lab sources. When a feed has been DEAD across runs, propose setting its active flag to false rather than deleting it; when a feed is STALE, that is usually fine (it is a low-volume blog). Do not invent replacement feed URLs — only propose a URL the operator gave you or one that appears in the run logs.
 
 How to work:
 1. Read the run's logs, script and cost when they are provided. Point at specific lines or exchanges when you diagnose something (a flat cold open, Claire too agreeable, a story that ran long, a validation retry, an expensive agent).
@@ -53,6 +57,12 @@ export function describeRun(run: RunRecord | null, events: RunEvent[], script: s
   if (run.status_history.length) lines.push("Status timeline: " + run.status_history.map((s) => `${s.status}@${s.at.slice(11, 19)}`).join(" → "));
   if (run.cost) lines.push(`Cost: total $${run.cost.total_usd} (LLM $${run.cost.llm_usd}${run.cost.llm_by_agent ? " — " + Object.entries(run.cost.llm_by_agent).map(([a, c]) => `${a} $${c}`).join(", ") : ""}; TTS $${run.cost.tts_usd}${run.cost.tts_chars ? ` for ${run.cost.tts_chars} chars` : ""}; Serper $${run.cost.serper_usd})`);
   if (run.result?.error) lines.push(`Error: ${String(run.result.error)}`);
+  if (run.source_health) {
+    const h = run.source_health;
+    lines.push(`\nSOURCE HEALTH (${h.ok}/${h.total} feeds OK inside the ${h.window_hours} h window):`);
+    if (h.unhealthy.length) lines.push(...h.unhealthy.map((r) => `- [${r.group}] tier ${r.tier} ${r.source}: ${r.verdict}${r.error ? ` (${r.error})` : ""} — ${r.url}`));
+    else lines.push("- every feed delivered stories");
+  }
   const logs = events.filter((e) => e.type === "log");
   const important = logs.filter((e) => e.level === "warning" || e.level === "error");
   const tail = logs.slice(-160);

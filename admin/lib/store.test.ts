@@ -19,6 +19,17 @@ describe("foldEvents", () => {
     expect(run.source).toBe("events");
   });
 
+  it("folds source_health into counts plus the unhealthy feeds", () => {
+    const row = (source: string, verdict: string, tier = "1") => ({ group: "main", source, tier, url: `https://${source}/rss`, status: verdict === "OK" ? 200 : 404, entries: 0, kept: 0, error: "", verdict });
+    const { run } = foldEvents(emptyRun("3"), [
+      { seq: 1, ts: "t1", type: "source_health", window_hours: 120, rows: [row("ok.test", "OK"), row("dead.test", "DEAD", "0"), row("stale.test", "STALE")] },
+    ]);
+    expect(run.source_health?.total).toBe(3);
+    expect(run.source_health?.ok).toBe(1);
+    expect(run.source_health?.window_hours).toBe(120);
+    expect(run.source_health?.unhealthy.map((r) => r.source)).toEqual(["dead.test", "stale.test"]);
+  });
+
   it("marks a run in progress on the first log line", () => {
     const { run } = foldEvents(emptyRun("2"), [{ seq: 1, ts: "t", type: "log", event: "x" }]);
     expect(run.status).toBe("IN_PROGRESS");

@@ -74,6 +74,29 @@ export interface RunRecord {
   github?: GitHubRunSummary;
   triggered_by?: string;
   triggered_inputs?: Record<string, string | boolean>;
+  /** Folded from the pipeline's `source_health` event: counts plus the feeds that were not OK. */
+  source_health?: SourceHealthSummary;
+}
+
+/** One feed as reported by pipeline/stages/ingest.py after a fetch. */
+export interface SourceHealthRow {
+  group: "main" | "aisle" | string;
+  source: string;
+  tier: string;
+  url: string;
+  status: number;
+  entries: number;
+  kept: number;
+  error: string;
+  verdict: "OK" | "DEAD" | "EMPTY" | "STALE" | string; // "HTTP 403" etc. for other non-200s
+}
+
+export interface SourceHealthSummary {
+  window_hours: number;
+  total: number;
+  ok: number;
+  /** Rows whose verdict is not OK, in the pipeline's order (group, tier, name). */
+  unhealthy: SourceHealthRow[];
 }
 
 export interface GitHubRunSummary {
