@@ -7,6 +7,7 @@ from typing import Any
 from pipeline.config import Settings
 from pipeline.llm import LLM
 from pipeline.log import get_logger
+from pipeline.show import compile_agent_prompt
 
 log = get_logger(stage="writer")
 
@@ -114,10 +115,12 @@ def write_script(settings: Settings, llm: LLM, brief: dict[str, Any], max_attemp
     word_max = int(cfg.get("word_count_max_hard", WORD_MAX))
     brief_text = format_brief(brief.get("stories", []), brief.get("cold_open_idea", ""))
     user = f"Write today's episode script.\n\n{brief_text}\n\nReturn only valid JSON."
+    # Hosts + dynamics come from config/show.yaml, rendered into the {{SHOW}} slot of writer.yaml.
+    system_prompt = compile_agent_prompt(settings, "writer")
 
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        result = llm.call_json("writer", user, schema=SCRIPT_SCHEMA)
+        result = llm.call_json("writer", user, schema=SCRIPT_SCHEMA, system_override=system_prompt)
         script = result.data.get("script", "")
         try:
             validate_script(script, word_min, word_max)

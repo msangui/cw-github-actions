@@ -1,0 +1,171 @@
+# Structured show definition: who the hosts are and how they interact.
+#
+# The writer and aisle_writer system prompts contain a {{SHOW}} placeholder; pipeline/show.py
+# renders this file into that slot at run time (see `compile_agent_prompt`). Everything else in
+# those prompts — the script rules, the verbatim sign-off lines and the `# SECTION:READ_THESE`
+# marker — stays in config/agents/*.yaml and is never generated from dials.
+#
+# Dials are 0–100 and map to one of five language bands (see `bands` below):
+#   0–19 → band 0, 20–39 → band 1, 40–59 → band 2, 60–79 → band 3, 80–100 → band 4.
+# The band text is what the model actually reads, so tune the words here if a dial does not
+# move the show the way you expect. The admin panel edits this file and commits it to git.
+
+show:
+  name: "Context Window"
+  premise: "A daily AI / agentic-engineering news show for technical peers."
+  audience: "Engineers and researchers who build with LLMs. Never explain what an LLM is."
+
+hosts:
+  FLINT:
+    name: "Flint"
+    role: "Main host"
+    bio: "Enthusiastic generalist, drives the show."
+    traits:
+      - "Enthusiastic generalist who carries the energy"
+      - "Drives the show: opens stories, hands off to Claire, closes them"
+      - "Never fully skeptical — he wants things to be true"
+    quirks:
+      - "Trails off with ellipsis (...)"
+      - "Interrupts himself mid-thought"
+    catchphrases:
+      - "Alright, alright —"
+    voice_notes: "Warm, quick, a little breathless when excited."
+    dials:
+      humor: 70
+      straightforwardness: 55
+      warmth: 85
+      skepticism: 20
+      verbosity: 60
+      energy: 85
+      technical_depth: 45
+  CLAIRE:
+    name: "Claire"
+    role: "Expert co-host"
+    bio: "PhD ML researcher, clinical skeptic, dry humor."
+    traits:
+      - "PhD ML researcher; precise about what a result does and does not show"
+      - "Clinical skeptic — enthusiasm has to be earned"
+      - "Dry humor, delivered flat"
+    quirks:
+      - "Em-dash (—) before precise rebukes"
+      - "Never uses exclamation marks"
+      - "Never enthusiastic about undeserving things"
+    catchphrases: []
+    voice_notes: "Even, unhurried, slightly amused. Lets silences do the work."
+    dials:
+      humor: 45
+      straightforwardness: 90
+      warmth: 30
+      skepticism: 90
+      verbosity: 35
+      energy: 30
+      technical_depth: 95
+
+# Show-level interaction dynamics (0–100, same five bands).
+dynamics:
+  joke_density: 50
+  banter: 55
+  disagreement: 60
+  interruptions: 40
+  tangents: 25
+  callbacks: 40
+  audience_address: 30
+  pace: 65
+
+# Band boundaries: a dial value v lands in band i where edges[i-1] <= v < edges[i].
+band_edges: [20, 40, 60, 80]
+
+# Five phrasings per dial, from lowest to highest. These are the sentences the writer reads.
+bands:
+  host:
+    humor:
+      - "Plays it completely straight; no jokes."
+      - "Rarely jokes; the occasional dry aside."
+      - "Regular light humor woven into the analysis."
+      - "Funny often; looks for the comic angle in most stories."
+      - "Relentlessly funny; every beat has a laugh in it."
+    straightforwardness:
+      - "Circles the point; hedges and qualifies heavily."
+      - "Gets there eventually, with some hedging."
+      - "Clear and direct most of the time."
+      - "Blunt; says exactly what they think."
+      - "Brutally direct; no hedging, no softening."
+    warmth:
+      - "Cold and clinical; no emotional register."
+      - "Reserved; polite but distant."
+      - "Friendly and approachable."
+      - "Warm and generous; obviously likes the co-host and the audience."
+      - "Radiates warmth; effusive, affectionate, encouraging."
+    skepticism:
+      - "Takes every claim at face value; a believer."
+      - "Mostly credulous; questions only obvious hype."
+      - "Balanced; weighs claims and evidence."
+      - "Skeptical by default; wants the evidence before agreeing."
+      - "Deeply skeptical; assumes hype until proven otherwise and says so."
+    verbosity:
+      - "Terse; one-line answers, clipped."
+      - "Brief; short sentences, few words."
+      - "Medium length; a few sentences per turn."
+      - "Expansive; builds arguments over several sentences."
+      - "Very talkative; long, layered monologues."
+    energy:
+      - "Flat, low-key, almost sleepy."
+      - "Calm and even."
+      - "Steady, engaged energy."
+      - "High energy; animated and quick."
+      - "Bursting with energy; can barely wait to speak."
+    technical_depth:
+      - "Stays at the headline level; no technical detail."
+      - "Light technical touch; names concepts but does not unpack them."
+      - "Comfortable with technical detail when it matters."
+      - "Goes deep: architectures, benchmarks, methodology."
+      - "Researcher-grade depth; cites the specific mechanism, caveats and prior work."
+  dynamics:
+    joke_density:
+      - "No jokes anywhere in the script."
+      - "A joke every few stories at most."
+      - "Roughly one laugh per story."
+      - "Several laughs per story; humor is a constant undercurrent."
+      - "Wall-to-wall jokes; the news is the setup."
+    banter:
+      - "No banter; strictly the news."
+      - "A little banter in the cold open only."
+      - "Some back-and-forth between stories."
+      - "Plenty of banter; they clearly enjoy each other."
+      - "Banter drives the show; stories are launchpads for it."
+    disagreement:
+      - "They always agree."
+      - "Mild differences of emphasis, quickly resolved."
+      - "They disagree sometimes and argue it out briefly."
+      - "They disagree often and push each other hard."
+      - "They spar on almost every story; genuine, unresolved disagreement is the point."
+    interruptions:
+      - "Nobody ever interrupts; clean turn-taking."
+      - "Rare interruptions."
+      - "Occasional interruptions and overlapping thoughts."
+      - "Frequent interruptions; they finish each other's sentences and cut in."
+      - "Constant interruptions; chaotic, fast, overlapping."
+    tangents:
+      - "Never go off topic."
+      - "Rare, short tangents that come straight back."
+      - "An occasional tangent that earns its place."
+      - "Tangents are welcome and sometimes run long."
+      - "Tangents everywhere; the show wanders freely."
+    callbacks:
+      - "No callbacks to earlier moments."
+      - "An occasional callback to an earlier story."
+      - "Callbacks to earlier stories and running bits are encouraged."
+      - "Frequent callbacks; running jokes build across the episode."
+      - "The episode is stitched together with callbacks and running bits."
+    audience_address:
+      - "Never address the listener directly."
+      - "Address the listener only in the sign-off."
+      - "Occasionally speak to the listener directly."
+      - "Regularly speak to the listener as a friend in the room."
+      - "The listener is the third person in the conversation; talk to them constantly."
+    pace:
+      - "Slow and deliberate; long pauses, few words per minute."
+      - "Unhurried."
+      - "Steady conversational pace."
+      - "Brisk; quick exchanges, little dead air."
+      - "Rapid-fire; short lines, high tempo."

@@ -35,10 +35,12 @@ feed and pings you on Telegram. Zero servers.
 | `llm_logs` table | `output/episodes/<date>/llm_logs/*.json`, uploaded as a run artifact |
 | CFO cost tracking (`cost_usd`) | `state/costs.json` + `config/budget.yaml` thresholds; monthly hard-pause still enforced |
 | Redis Serper cache | Dropped (one run per day; Serper calls are parallelized instead) |
-| FastAPI admin API + Next.js UI | Git. Edit YAML, commit, next run picks it up. Manual triggers via `workflow_dispatch`. |
+| FastAPI admin API + Next.js UI | Git. Edit YAML, commit, next run picks it up — by hand, or through the **producer panel** in `admin/` (Next.js on Vercel, Clerk SSO) which commits via the GitHub API, triggers `workflow_dispatch` and shows a run's logs live. |
 | Postgres `publish` | RSS feed builder (`pipeline/feed.py`) — `feed.xml` and `feed-extended.xml` |
 
-Everything editorial was carried over verbatim: host personas, script rules, the verbatim sign-off lines,
+Host personas now live as structured data in `config/show.yaml` (bio, traits, quirks, 0–100 manner dials
+and show-level dynamics, each dial mapped to one of five sentences); `pipeline/show.py` renders them into
+the `{{SHOW}}` slot of the writer prompts. Everything else editorial was carried over verbatim: script rules, the verbatim sign-off lines,
 the scoring rubric, the Aisle relevance keywords, the newsletter template, the ffmpeg duck curve.
 Two known defects from the original were fixed along the way: the curator prompt now actually receives
 the story list, and the writer prompt includes the `# SECTION:READ_THESE` marker the extended edition
@@ -83,6 +85,7 @@ Secrets:
 | `OPENAI_API_KEY` | optional — semantic dedup of headlines |
 | `SERPER_API_KEY` | optional — cross-coverage scoring |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | optional — operator notifications |
+| `PANEL_TOKEN` | optional — bearer token for the admin panel's live log feed (with variable `PANEL_URL`; see `admin/README.md`) |
 
 ### 3. Podcast metadata
 
@@ -162,6 +165,18 @@ Run flags (`python -m pipeline run --help`):
    dedup memory; rebuild both feeds; record cost; Telegram summary with the deep-dive links.
 
 Status history is written to `output/episodes/<date>/status.json` and mirrored into the job summary.
+When `PANEL_URL` + `PANEL_TOKEN` are set, every JSON log line plus status / script / cost / result events
+are also batch-POSTed to the admin panel (`pipeline/log.py` → `PanelReporter`); a panel outage never fails
+a run.
+
+### The admin panel
+
+`admin/` is a separate Next.js app (Vercel + Clerk with Google Workspace SSO) for tuning the show
+without editing YAML by hand: hosts & dials, dynamics, per-agent model/effort/prompt, sources, voices &
+mix, budget, podcast metadata, and a Runs tab that triggers `workflow_dispatch` and shows logs live. Every
+change is a git commit made through the GitHub API; an embedded producer agent (Claude) reads a run's
+logs and script and proposes config patches as diff cards. Setup, the events contract and the
+`show.yaml` schema are documented in [`admin/README.md`](admin/README.md).
 
 ### Re-runs and idempotency
 
@@ -215,7 +230,9 @@ pipeline/
   feed.py           RSS/iTunes feed builder
   stages/           ingest, coverage, curator, aisle_curator, writer, aisle_writer,
                     editor, tts, stitch, newsletter(+template), cfo, publish
-config/             podcast, sources, voices, stitch, budget, curation, agents/*.yaml
+  show.py           renders config/show.yaml (hosts, dials, dynamics) into the writer prompts
+config/             show, podcast, sources, voices, stitch, budget, curation, agents/*.yaml
+admin/              producer panel (Next.js, Vercel, Clerk) — see admin/README.md
 assets/             intro.mp3 (jingle), cover.png (placeholder artwork)
 infra/              setup-aws.sh + IAM/bucket policy templates, cloudflare-trigger/ (cron worker)
 scripts/            make_cover.py, probe_sources.py (feed health diagnostic)

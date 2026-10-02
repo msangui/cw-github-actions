@@ -7,6 +7,7 @@ from typing import Any
 from pipeline.config import Settings
 from pipeline.llm import LLM
 from pipeline.log import get_logger
+from pipeline.show import compile_agent_prompt
 from pipeline.stages.writer import ScriptValidationError
 
 log = get_logger(stage="aisle_writer")
@@ -51,9 +52,10 @@ def write_aisle(settings: Settings, llm: LLM, brief: dict[str, Any], max_attempt
         return stub_aisle_script(stories)
 
     user = f"Write The Aisle segment.\n\n{_format_brief(stories, brief.get('aisle_brief', ''))}\n\nReturn only valid JSON."
+    system_prompt = compile_agent_prompt(settings, "aisle_writer")
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        result = llm.call_json("aisle_writer", user, schema=AISLE_SCRIPT_SCHEMA)
+        result = llm.call_json("aisle_writer", user, schema=AISLE_SCRIPT_SCHEMA, system_override=system_prompt)
         try:
             validate_aisle_script(result.data.get("script", ""))
         except ScriptValidationError as e:

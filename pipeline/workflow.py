@@ -20,7 +20,7 @@ from typing import Any, Optional
 from pipeline.checkpoint import Checkpoints
 from pipeline.config import Settings
 from pipeline.llm import LLM
-from pipeline.log import get_logger
+from pipeline.log import get_logger, panel
 from pipeline.memory import HeadlineMemory
 from pipeline.notify import esc, telegram
 from pipeline.stages import cfo, ingest
@@ -56,6 +56,7 @@ class EpisodeRun:
         self.llm = LLM(settings, log_dir=self.out_dir / "llm_logs")
         self.ckpt = Checkpoints(self.storage, episode_date, self.out_dir, fresh=settings.fresh)
         self.log = log.bind(date=episode_date)
+        panel.set_run_meta(episode_date=episode_date, dry_run=settings.dry_run, skip_aisle=settings.skip_aisle, fresh=settings.fresh, run_url=_run_url())
         self.status_log: list[dict[str, str]] = []
         self.llm_calls: list[tuple[str, str | None, dict[str, int]]] = []
         self.serper_queries = 0
@@ -65,6 +66,7 @@ class EpisodeRun:
     def set_status(self, status: str) -> None:
         self.status_log.append({"status": status, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
         self.log.info("STATUS", status=status)
+        panel.event("status", status=status)
         (self.out_dir / "status.json").write_text(json.dumps({"date": self.date, "status": status, "history": self.status_log}, indent=2), encoding="utf-8")
 
     def stage(self, name: str, fn, *args, **kwargs):
@@ -85,6 +87,12 @@ class EpisodeRun:
 
     # ── main ───────────────────────────────────────────────────────────────
     def run(self) -> dict[str, Any]:
+        result = self._run_guarded()
+        panel.event("result", **{k: v for k, v in result.items() if k in ("status", "date", "title", "word_count", "cost", "audio_url", "extended_audio_url", "newsletter_url", "error", "has_aisle_variant")})
+        panel.close()
+        return result
+
+    def _run_guarded(self) -> dict[str, Any]:
         s = self.settings
         existing = self.storage.get_json(f"episodes/{self.date}/episode.json")
         if existing and existing.get("status") == "PUBLISHED" and not s.fresh and not s.dry_run:
@@ -174,6 +182,7 @@ class EpisodeRun:
 
         approved_script = editor_result["corrected_script"]
         self._write_text("script.txt", approved_script)
+        panel.event("script", script=approved_script, title=metadata.get("title", ""), word_count=len(approved_script.split()), hallucinations=editor_result.get("hallucinations", []), changes=len(editor_result.get("changes", [])))
 
         if s.dry_run:
             self.set_status("DRY_RUN_COMPLETE")
@@ -249,6 +258,7 @@ class EpisodeRun:
         s = self.settings
         self.set_status("SAFE_MODE")
         self._write_text("script_rejected.txt", script_result.get("script", ""))
+        panel.event("script", script=script_result.get("script", ""), title=script_result.get("metadata", {}).get("title", ""), word_count=len(script_result.get("script", "").split()), hallucinations=editor_result.get("hallucinations", []), rejected=True)
         extended = None
         if approved_aisle_script and not s.dry_run and ffmpeg_available():
             try:
@@ -271,7 +281,9 @@ class EpisodeRun:
 
     # ── cost / notify ──────────────────────────────────────────────────────
     def _cost(self) -> dict[str, Any]:
-        return cfo.estimate_cost(self.settings, self.llm_calls, self.tts_chars, self.serper_queries)
+        cost = cfo.estimate_cost(self.settings, self.llm_calls, self.tts_chars, self.serper_queries)
+        panel.event("cost", cost=cost)
+        return cost
 
     def _notify_published(self, metadata: dict, brief: dict, result: dict, cost: dict, alerts: list[str], has_aisle: bool) -> None:
         picks = "\n".join(f"• <a href=\"{esc(p.get('url', ''))}\">{esc(p.get('title', ''))}</a>" for p in metadata.get("deep_dive_picks", [])[:6] if p.get("url"))
