@@ -64,8 +64,13 @@ async function gh<T>(cfg: RepoConfig, method: string, path: string, body?: unkno
   return json as T;
 }
 
+/** Branch names may contain slashes (claude/feature); GitHub wants them literal in ref URLs. */
+function refPath(branch: string): string {
+  return branch.split("/").map(encodeURIComponent).join("/");
+}
+
 export async function getBranchHead(cfg: RepoConfig): Promise<string> {
-  const ref = await gh<{ object: { sha: string } }>(cfg, "GET", `/repos/${cfg.owner}/${cfg.repo}/git/ref/heads/${encodeURIComponent(cfg.branch)}`);
+  const ref = await gh<{ object: { sha: string } }>(cfg, "GET", `/repos/${cfg.owner}/${cfg.repo}/git/ref/heads/${refPath(cfg.branch)}`);
   return ref.object.sha;
 }
 
@@ -108,7 +113,7 @@ export async function commitFiles(cfg: RepoConfig, parentSha: string, files: Rec
     ...(author ? { author: { ...author, date: new Date().toISOString() } } : {}),
   });
   try {
-    await gh(cfg, "PATCH", `${base}/git/refs/heads/${encodeURIComponent(cfg.branch)}`, { sha: commit.sha, force: false });
+    await gh(cfg, "PATCH", `${base}/git/refs/heads/${refPath(cfg.branch)}`, { sha: commit.sha, force: false });
   } catch (e) {
     if (e instanceof GitHubError && e.status === 422) {
       throw new GitHubError("The branch moved since you loaded the config (not a fast-forward). Reload and re-apply your changes.", 409, e.body);
