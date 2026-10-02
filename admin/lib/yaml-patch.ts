@@ -14,7 +14,8 @@ export const PatchOp = z.discriminatedUnion("op", [
 ]);
 export type PatchOp = z.infer<typeof PatchOp>;
 
-export const STRINGIFY_OPTS = { lineWidth: 0, blockQuote: "literal" as const };
+// lineWidth 0: never re-wrap long lines; no flow padding so `[20, 40]` is not rewritten as `[ 20, 40 ]`.
+export const STRINGIFY_OPTS = { lineWidth: 0, blockQuote: "literal" as const, flowCollectionPadding: false };
 
 export function parseYaml<T = unknown>(text: string): T {
   const doc = parseDocument(text);

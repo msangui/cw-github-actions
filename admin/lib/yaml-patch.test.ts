@@ -41,6 +41,11 @@ describe("applyPatch", () => {
     }
   });
 
+  it("does not re-space flow sequences", () => {
+    const src = "band_edges: [20, 40, 60, 80]\nx: 1\n";
+    expect(applyPatch(src, [{ op: "set", path: ["x"], value: 2 }])).toBe("band_edges: [20, 40, 60, 80]\nx: 2\n");
+  });
+
   it("rejects impossible ops", () => {
     expect(() => applyPatch("a: 1\n", [{ op: "delete", path: ["b"] }])).toThrow();
     expect(() => applyPatch("a: 1\n", [{ op: "append", path: ["a"], value: 2 }])).toThrow();

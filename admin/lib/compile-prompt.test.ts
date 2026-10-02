@@ -8,16 +8,26 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const read = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
 
 describe("compile-prompt (parity with pipeline/show.py)", () => {
-  const show = parse(read("config/show.yaml")) as ShowConfig;
+  // Frozen inputs under tests/fixtures/, so commits to config/ from the panel never break this.
+  const show = parse(read("tests/fixtures/show.yaml")) as ShowConfig;
 
   it("matches the Python golden output for the writer", () => {
-    const writer = parse(read("config/agents/writer.yaml")) as { system_prompt: string };
+    const writer = parse(read("tests/fixtures/writer.yaml")) as { system_prompt: string };
     expect(compileSystemPrompt(writer.system_prompt, show)).toBe(read("tests/fixtures/compiled_writer_prompt.txt"));
   });
 
   it("matches the Python golden output for the aisle writer", () => {
-    const aisle = parse(read("config/agents/aisle_writer.yaml")) as { system_prompt: string };
+    const aisle = parse(read("tests/fixtures/aisle_writer.yaml")) as { system_prompt: string };
     expect(compileSystemPrompt(aisle.system_prompt, show)).toBe(read("tests/fixtures/compiled_aisle_writer_prompt.txt"));
+  });
+
+  it("compiles the live config without errors and keeps the load-bearing lines", () => {
+    const live = parse(read("config/show.yaml")) as ShowConfig;
+    const writer = parse(read("config/agents/writer.yaml")) as { system_prompt: string };
+    const out = compileSystemPrompt(writer.system_prompt, live);
+    expect(out).not.toContain("{{SHOW}}");
+    expect(out).toContain("# SECTION:READ_THESE");
+    expect(out).toContain('CLAIRE: "You always do."');
   });
 
   it("maps dials to five bands", () => {

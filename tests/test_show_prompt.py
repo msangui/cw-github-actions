@@ -29,7 +29,16 @@ SIGN_OFFS = [
 
 
 def _show() -> dict:
+    """Frozen copy of show.yaml (tests/fixtures/show.yaml) so panel commits to config/ never break CI."""
+    return yaml.safe_load((FIXTURES / "show.yaml").read_text(encoding="utf-8"))
+
+
+def _live_show() -> dict:
     return yaml.safe_load((REPO_ROOT / "config" / "show.yaml").read_text(encoding="utf-8"))
+
+
+def _fixture_prompt(agent: str) -> str:
+    return yaml.safe_load((FIXTURES / f"{agent}.yaml").read_text(encoding="utf-8"))["system_prompt"]
 
 
 def test_band_index_boundaries():
@@ -43,7 +52,8 @@ def test_band_index_boundaries():
 
 
 def test_every_dial_has_five_bands():
-    show = _show()
+    """Runs against the live config: this is the structural contract the panel must keep."""
+    show = _live_show()
     for d in HOST_DIALS:
         assert len(show["bands"]["host"][d]) == 5, d
     for d in DYNAMICS_DIALS:
@@ -104,14 +114,16 @@ def test_compiled_aisle_prompt_keeps_transition_lines():
     assert "HOSTS:" in prompt
 
 
-def test_golden_fixtures_match_current_config():
-    """Shared with admin/lib/compile-prompt.test.ts — regenerate both when show.yaml changes:
-    python -c "from pipeline.config import Settings; from pipeline.show import compile_agent_prompt as c;
-    open('tests/fixtures/compiled_writer_prompt.txt','w').write(c(Settings(),'writer'))"
+def test_golden_fixtures_match_frozen_inputs():
+    """Parity contract with admin/lib/compile-prompt.test.ts: both compilers must turn
+    tests/fixtures/{show,writer,aisle_writer}.yaml into tests/fixtures/compiled_*_prompt.txt.
+    Only regenerate when the *compiler* changes (not when config/ changes):
+      python -c "import yaml; from pipeline.show import compile_system_prompt as c; s=yaml.safe_load(open('tests/fixtures/show.yaml'));
+      [open(f'tests/fixtures/compiled_{a}_prompt.txt','w').write(c(yaml.safe_load(open(f'tests/fixtures/{a}.yaml'))['system_prompt'], s)) for a in ('writer','aisle_writer')]"
     """
-    s = Settings()
-    assert compile_agent_prompt(s, "writer") == (FIXTURES / "compiled_writer_prompt.txt").read_text(encoding="utf-8")
-    assert compile_agent_prompt(s, "aisle_writer") == (FIXTURES / "compiled_aisle_writer_prompt.txt").read_text(encoding="utf-8")
+    show = _show()
+    assert compile_system_prompt(_fixture_prompt("writer"), show) == (FIXTURES / "compiled_writer_prompt.txt").read_text(encoding="utf-8")
+    assert compile_system_prompt(_fixture_prompt("aisle_writer"), show) == (FIXTURES / "compiled_aisle_writer_prompt.txt").read_text(encoding="utf-8")
 
 
 def test_dial_change_flows_into_compiled_prompt(tmp_path, monkeypatch):
@@ -120,7 +132,7 @@ def test_dial_change_flows_into_compiled_prompt(tmp_path, monkeypatch):
     (cfg_dir / "agents").mkdir(parents=True)
     for p in (REPO_ROOT / "config" / "agents").glob("*.yaml"):
         (cfg_dir / "agents" / p.name).write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
-    show = copy.deepcopy(_show())
+    show = copy.deepcopy(_live_show())
     show["hosts"]["FLINT"]["dials"]["skepticism"] = 95
     show["dynamics"]["joke_density"] = 0
     (cfg_dir / "show.yaml").write_text(yaml.safe_dump(show, allow_unicode=True), encoding="utf-8")

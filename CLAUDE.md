@@ -33,8 +33,9 @@ Entry point: `python -m pipeline <run|rebuild-feed|check-config>` (`pipeline/cli
   prompt, model, voice ID or threshold in Python.
 - **Hosts and dynamics live in `config/show.yaml`** and are rendered into the `{{SHOW}}` slot of
   `writer.yaml` / `aisle_writer.yaml` by `pipeline/show.py`. `admin/lib/compile-prompt.ts` is a port of
-  it; both must reproduce `tests/fixtures/compiled_writer_prompt.txt` (regenerate the fixture when
-  show.yaml or the writer prompt changes, and keep the two implementations in step).
+  it; both must turn the frozen inputs `tests/fixtures/{show,writer,aisle_writer}.yaml` into
+  `tests/fixtures/compiled_*_prompt.txt`. Regenerate the goldens only when the compiler changes (the
+  command is in `tests/test_show_prompt.py`); config edits from the panel must never break tests.
 - **`pipeline/log.py` may report to the admin panel** (`PANEL_URL` + `PANEL_TOKEN`): batched, background
   thread, never raises. Emit run-level facts via `panel.event(...)` from `workflow.py`, not ad hoc HTTP.
 - **Claude calls go through `pipeline/llm.py`** (`LLM.call_json`): streaming, structured-output JSON
