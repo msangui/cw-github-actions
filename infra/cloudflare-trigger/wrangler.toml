@@ -1,0 +1,22 @@
+name = "context-window-trigger"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Tuesday and Thursday at 10:00 UTC = 06:00 New York in summer (EDT), 05:00 in winter (EST).
+# Cloudflare crons are UTC with no DST support; one fixed hour keeps the worker trivial. Change the
+# hour here if the winter time matters. Weekdays are written as names because Cloudflare numbers them
+# 1-7 from Sunday, unlike standard cron. Every firing dispatches — there is no time-of-day check.
+[triggers]
+crons = ["0 10 * * TUE,THU"]
+
+[vars]
+GITHUB_REPO = "msangui/cw-github-actions"
+EVENT_TYPE = "produce-episode"
+# "true" makes scheduled runs text-only (no TTS / publish). Manual triggers are always dry unless asked.
+DRY_RUN = "false"
+
+# Secrets (not in this file). Set in the dashboard (Settings → Variables and Secrets, type Secret)
+# or with `npx wrangler secret put <NAME>`:
+#   GH_TOKEN        fine-grained GitHub PAT, this repo only, permission "Contents: Read and write"
+#                   (repository_dispatch needs Contents, not Actions)
+#   TRIGGER_SECRET  any long random string; enables the manual trigger URL (see README)

@@ -104,11 +104,13 @@ def test_cfo_cost_and_thresholds(settings):
     storage = Storage(settings)
     alerts = cfo.record_episode_cost(settings, storage, "2026-09-26", cost)
     assert any("Daily spend" in a for a in alerts)
-    assert cfo.check_budget_before_run(settings, storage) == cost["total_usd"]
-    storage.put_json(cfo.COSTS_KEY, {"episodes": {"2026-09-01": {"total_usd": 200}}})
     from datetime import date
 
     import pytest
+
+    # Pin the month: the episode above is dated September and date.today() rolls past it.
+    assert cfo.check_budget_before_run(settings, storage, today=date(2026, 9, 26)) == cost["total_usd"]
+    storage.put_json(cfo.COSTS_KEY, {"episodes": {"2026-09-01": {"total_usd": 200}}})
 
     with pytest.raises(cfo.BudgetPaused):
         cfo.check_budget_before_run(settings, storage, today=date(2026, 9, 26))

@@ -29,3 +29,7 @@ output/site/
 # Generated audio anywhere except the bundled intro jingle
 *.mp3
 !assets/intro.mp3
+
+# Cloudflare wrangler local state (account cache, dev secrets)
+.wrangler/
+.dev.vars

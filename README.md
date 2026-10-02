@@ -95,9 +95,11 @@ Replace `assets/cover.png` with real 1400–3000 px square artwork when you have
 
 ### 4. First episode
 
-Actions → **Daily episode** → *Run workflow*. There is no cron; trigger it from your own scheduler with
-`gh workflow run daily-episode.yml` or a `repository_dispatch` call (see the header of the workflow file
-for the exact `curl`; a fine-grained PAT with *Actions: write* on this repo is enough). Tick **dry_run** the first time to see the script and cost
+Actions → **Daily episode** → *Run workflow*. There is no cron in the repo; the schedule lives in a
+Cloudflare Worker (`infra/cloudflare-trigger/`, Tuesday and Thursday 06:00 America/New_York) that calls
+`repository_dispatch`. Any other scheduler can do the same with a fine-grained PAT that has *Contents:
+Read and write* on this repo (not *Actions*, which only covers `workflow_dispatch`); the exact `curl` is in
+the header of the workflow file. Tick **dry_run** the first time to see the script and cost
 without spending on TTS; the run artifact contains `brief.json`, `script.txt`, `cost.json` and every LLM
 call. Then run it for real. The job summary links the MP3, newsletter and feed URL.
 
@@ -216,6 +218,7 @@ and pauses at $145/month.
 .github/workflows/daily-episode.yml   cron + manual trigger → produce & publish
 .github/workflows/rebuild-feed.yml    regenerate feeds after editing podcast.yaml
 .github/workflows/ci.yml              ruff + pytest + keyless smoke run
+.github/workflows/probe-sources.yml   manual: feed health report for sources.yaml + docs/spikes/candidate-feeds.yaml
 pipeline/
   workflow.py       orchestration, status machine, safe mode, notifications
   cli.py            run / rebuild-feed / check-config
@@ -231,6 +234,8 @@ pipeline/
 config/             show, podcast, sources, voices, stitch, budget, curation, agents/*.yaml
 admin/              producer panel (Next.js, Vercel, Clerk) — see admin/README.md
 assets/             intro.mp3 (jingle), cover.png (placeholder artwork)
-infra/              setup-aws.sh + IAM/bucket policy templates
+infra/              setup-aws.sh + IAM/bucket policy templates, cloudflare-trigger/ (cron worker)
+scripts/            make_cover.py, probe_sources.py (feed health diagnostic)
+docs/spikes/        design spikes (data sources & ingestion, candidate feed list)
 tests/              unit tests + ffmpeg-backed audio/publish tests
 ```

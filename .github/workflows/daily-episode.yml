@@ -6,7 +6,9 @@ name: Daily episode
 #       curl -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
 #         https://api.github.com/repos/msangui/cw-github-actions/dispatches \
 #         -d '{"event_type":"produce-episode","client_payload":{"dry_run":false}}'
-#     (client_payload accepts the same keys as the workflow_dispatch inputs below)
+#     (client_payload accepts the same keys as the workflow_dispatch inputs below; the token needs
+#      the fine-grained "Contents: Read and write" permission — "Actions: write" only covers
+#      workflow_dispatch and gets a 403 here)
 on:
   repository_dispatch:
     types: [produce-episode]
