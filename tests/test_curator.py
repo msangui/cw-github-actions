@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from pipeline.memory import HeadlineMemory, title_overlap
 from pipeline.stages.curator import _merge_llm_brief, dedup_stories, score_story, simple_dedup
@@ -41,8 +41,10 @@ def test_title_overlap_and_simple_dedup():
 def test_dedup_against_memory(settings):
     storage = Storage(settings)
     memory = HeadlineMemory(storage)
-    memory.add("headlines", NOW.date().isoformat(), [_story("Meta open sources Llama 5 weights", url="https://meta.ai/llama5")])
-    memory.save(today=NOW.date())
+    # dedup_stories queries the memory with today's date, so the past episode must be inside the live window.
+    covered_on = (date.today() - timedelta(days=1)).isoformat()
+    memory.add("headlines", covered_on, [_story("Meta open sources Llama 5 weights", url="https://meta.ai/llama5")])
+    memory.save()
 
     fresh = HeadlineMemory(storage)
     stories = [

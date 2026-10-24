@@ -32,8 +32,11 @@ export function agentKey(p: string): string {
 
 /** Models the Agents tab offers. Pricing is read from config/budget.yaml, not hardcoded here. */
 export const MODEL_OPTIONS = [
-  { id: "claude-opus-5", label: "Claude Opus 5 (default)" },
-  { id: "claude-sonnet-5", label: "Claude Sonnet 5 (cheaper)" },
+  { id: "claude-opus-5-5", label: "Claude Opus 5.5 (default)" },
+  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5 (cheaper)" },
+  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5 (cheapest)" },
+  { id: "claude-opus-5", label: "Claude Opus 5" },
+  { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
   { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 (fastest)" },
 ];

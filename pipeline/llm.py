@@ -93,7 +93,7 @@ class LLM:
         if not cfg:
             raise LLMError(f"Missing agent config: config/agents/{agent_key}.yaml")
 
-        model = cfg.get("model", "claude-opus-5")
+        model = cfg.get("model", "claude-opus-5-5")
         max_tokens = int(cfg.get("max_tokens", 16000))
         system_prompt = system_override or cfg.get("system_prompt", "")
 

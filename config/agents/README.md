@@ -7,7 +7,7 @@ Fields:
 
 | field | meaning |
 |---|---|
-| `model` | Claude model ID. Default `claude-opus-5`. |
+| `model` | Claude model ID. Default `claude-opus-5-5`. |
 | `max_tokens` | Output cap for the call. |
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max`. Controls adaptive thinking depth on Claude 4.6+ models. |
 | `temperature` | Only sent for models that still accept sampling params (4.6 family and older). Ignored on Claude 5 models. |

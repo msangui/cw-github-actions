@@ -2,6 +2,10 @@
 pricing:
   # USD per 1M tokens, keyed by model prefix. First matching prefix wins.
   llm:
+    # Longer prefixes first: matching is by prefix, so claude-opus-5-5 must precede claude-opus-5.
+    claude-opus-5-5:   { input: 4.00,  output: 20.00 }
+    claude-sonnet-5-5: { input: 2.00,  output: 10.00 }
+    claude-haiku-5-5:  { input: 0.10,  output: 0.50 }
     claude-opus-5:   { input: 5.00,  output: 25.00 }
     claude-sonnet-5: { input: 2.00,  output: 10.00 }
     claude-opus-4:   { input: 5.00,  output: 25.00 }

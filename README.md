@@ -206,10 +206,10 @@ s3://<bucket>/[prefix/]
 
 ## Costs
 
-Defaults use `claude-opus-5` for every agent (`config/agents/*.yaml`); switch individual agents to
-`claude-sonnet-5` if you want to trade quality for spend. Per episode, roughly: LLM $1–2 (five to six
-calls, the writer dominates), ElevenLabs ~$7 at the Creator-plan rate for ~20k characters, Serper
-pennies. `cost.json` in every run artifact has the exact numbers and the CFO alerts at $5/day, $120/month
+Defaults use `claude-opus-5-5` for every agent except the newsletter, which is pure extraction and runs
+on `claude-sonnet-5-5` (`config/agents/*.yaml`). The editor returns line edits rather than the whole
+script, so its output stays small. Per episode, roughly: LLM ~$0.50 (seven calls; writer and editor
+dominate), ElevenLabs ~$3.5–4 at the Creator-plan overage rate for ~24k characters, Serper pennies. `cost.json` in every run artifact has the exact numbers and the CFO alerts at $5/day, $120/month
 and pauses at $145/month.
 
 ## Project structure
