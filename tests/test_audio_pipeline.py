@@ -1,6 +1,7 @@
 """ffmpeg-backed tests: synthetic tone MP3s stand in for ElevenLabs lines."""
 
 import subprocess
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -56,7 +57,8 @@ def test_publish_writes_episode_json_memory_and_feed(settings, tmp_path):
     assert 1.5 <= eps[0]["audio"]["standard"]["duration_seconds"] <= 2.5
     assert storage.exists("feed.xml") and storage.exists("cover.png") and storage.exists("episodes/2026-09-26/newsletter.html")
     fresh = HeadlineMemory(storage)
-    assert fresh.was_covered({"title": "Big model drop", "url": ""}, "headlines", 21, 0.6)
+    # The episode is dated 2026-09-26; query the memory as of that date so the 21-day window never expires.
+    assert fresh.was_covered({"title": "Big model drop", "url": ""}, "headlines", 21, 0.6, today=date(2026, 9, 27))
     # Same-day rerun of publish is idempotent
     publish_episode(settings, storage, memory, "2026-09-26", "PUBLISHED", {"title": "Ep"}, "FLINT: hi", stories, [], str(mp3), None, None, [])
     assert len(load_episodes(storage)) == 1
