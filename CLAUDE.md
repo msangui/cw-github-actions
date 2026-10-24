@@ -39,7 +39,7 @@ Entry point: `python -m pipeline <run|rebuild-feed|check-config>` (`pipeline/cli
 - **`pipeline/log.py` may report to the admin panel** (`PANEL_URL` + `PANEL_TOKEN`): batched, background
   thread, never raises. Emit run-level facts via `panel.event(...)` from `workflow.py`, not ad hoc HTTP.
 - **Claude calls go through `pipeline/llm.py`** (`LLM.call_json`): streaming, structured-output JSON
-  schema, retries, per-call logs. Models are the Claude 5 family (`claude-opus-5` default); the 1.x
+  schema, retries, per-call logs. Models are the Claude 5 family (`claude-opus-5-5` default); the 1.x
   `anthropic` SDK has no `temperature` kwarg — legacy models get it via `extra_body`.
 - **Degrade, don't crash, on optional services**: no OpenAI key → title-overlap dedup; no Serper →
   coverage 1; no Telegram → silent; no Anthropic key → stub script + auto-approve (used by CI).

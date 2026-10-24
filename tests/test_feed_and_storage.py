@@ -98,6 +98,9 @@ def test_cfo_cost_and_thresholds(settings):
     )
     rate = float(settings.load_yaml("budget")["pricing"]["elevenlabs_per_1k_chars"])
     assert cost["llm_by_agent"]["writer"] == round(10_000 / 1e6 * 5 + 6_000 / 1e6 * 25, 4)
+    # Prefix matching: the Opus 5.5 row must win over the claude-opus-5 prefix.
+    opus55 = cfo._llm_rate(settings.load_yaml("budget")["pricing"], "claude-opus-5-5")
+    assert (float(opus55["input"]), float(opus55["output"])) == (4.0, 20.0)
     assert cost["tts_usd"] == round(50 * rate, 4)
     assert cost["serper_usd"] == 0.1
     assert cost["total_usd"] > 6.0, "test needs to cross the daily breakdown threshold"

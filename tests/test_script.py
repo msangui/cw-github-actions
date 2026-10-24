@@ -1,7 +1,7 @@
 import pytest
 
 from pipeline.llm import LLMError, extract_json
-from pipeline.stages.editor import _restore_marker
+from pipeline.stages.editor import _restore_marker, apply_edits, number_script
 from pipeline.stages.stitch import combine_for_extended, duck_expression
 from pipeline.stages.tts import parse_script_lines
 from pipeline.stages.writer import (
@@ -73,3 +73,38 @@ def test_extract_json_tolerates_fences_and_prose():
     assert extract_json('prefix {"a": {"b": 2}} suffix') == '{"a": {"b": 2}}'
     with pytest.raises(LLMError):
         extract_json("no json here")
+
+
+def test_number_script_skips_blank_lines_and_counts_marker():
+    numbered = number_script("FLINT: a\n\nCLAIRE: b\n" + SECTION_MARKER + "\n")
+    assert numbered.split("\n") == ["L1: FLINT: a", "L2: CLAIRE: b", f"L3: {SECTION_MARKER}"]
+
+
+def test_apply_edits_replaces_deletes_and_splits_by_line_number():
+    edits = [
+        {"line": 1, "original": "FLINT: Hey there.", "replacement": "FLINT: Hey there, Claire."},
+        {"line": 2, "original": "CLAIRE: Hello.", "replacement": ""},
+        {"line": 5, "original": "CLAIRE: Bye.", "replacement": "CLAIRE: Bye.\nFLINT: Unfortunately."},
+    ]
+    corrected, skipped = apply_edits(SCRIPT, edits)
+    assert skipped == []
+    assert corrected.split("\n") == ["FLINT: Hey there, Claire.", SECTION_MARKER, "FLINT: Read these.", "CLAIRE: Bye.", "FLINT: Unfortunately."]
+
+
+def test_apply_edits_falls_back_to_text_match_when_line_number_is_off():
+    corrected, skipped = apply_edits(SCRIPT, [{"line": 9, "original": "FLINT: Read these.", "replacement": "FLINT: Read these two."}])
+    assert skipped == [] and "FLINT: Read these two." in corrected and "FLINT: Read these." not in corrected
+
+
+def test_apply_edits_skips_marker_bad_prefix_and_unlocatable_lines():
+    edits = [
+        {"line": 3, "original": SECTION_MARKER, "replacement": ""},
+        {"line": 1, "original": "FLINT: Hey there.", "replacement": "NARRATOR: no"},
+        {"line": 2, "original": "CLAIRE: Something that is not in the script at all.", "replacement": "CLAIRE: x"},
+    ]
+    corrected, skipped = apply_edits(SCRIPT, edits)
+    assert corrected == SCRIPT and len(skipped) == 3
+
+
+def test_apply_edits_with_no_edits_is_identity():
+    assert apply_edits(SCRIPT, []) == (SCRIPT, [])

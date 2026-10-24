@@ -1,4 +1,4 @@
-model: claude-opus-5
+model: claude-opus-5-5
 max_tokens: 16000
 effort: high
 # {{SHOW}} is replaced at run time with the hosts + dynamics rendered from config/show.yaml
